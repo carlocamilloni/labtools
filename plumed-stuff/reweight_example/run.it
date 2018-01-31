@@ -1,0 +1,5 @@
+#plumed driver --mf_xtc concatenated.xtc --plumed plumed.dat 
+norm=`grep -v \# cvbias.dat | awk '{sum+=exp($7/2.48)} END {print sum}'`
+grep -v \# cvbias.dat | awk '{print exp($7/2.48)/'$norm'}' > weights.dat
+awk '{if(NR==1) print ""; print $0}' weights.dat > tmp; mv tmp weights.dat
+paste cvbias.dat weights.dat | awk '{if($1!="#!") print $1, $2, $3, $4, $5, $6, $8;else print $0}' > cv-weights.dat
