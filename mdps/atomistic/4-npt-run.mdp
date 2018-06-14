@@ -25,7 +25,7 @@ simulation_part          = 1
 ; mode for center of mass motion removal
 comm-mode                = Linear
 ; number of steps for center of mass motion removal
-nstcomm                  = 20
+nstcomm                  = 25
 ; group(s) for center of mass motion removal
 comm-grps                = 
 
@@ -52,7 +52,7 @@ energygrps               =
 ; cut-off scheme (Verlet: particle based cut-offs, group: using charge groups)
 cutoff-scheme            = Verlet
 ; nblist update frequency
-nstlist                  = 20
+nstlist                  = 25
 ; ns algorithm (simple or grid)
 ns_type                  = grid
 ; Periodic boundary conditions: xyz, no, xy
