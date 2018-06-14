@@ -130,7 +130,7 @@ gen_temp                 = _TEMP_
 gen_seed                 = -1
 
 ; OPTIONS FOR BONDS    
-constraints              = all-bonds
+constraints              = h-bonds
 ; Type of constraint algorithm
 constraint-algorithm     = Lincs
 ; Do not constrain the start configuration
