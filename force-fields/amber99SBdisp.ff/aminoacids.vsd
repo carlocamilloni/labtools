@@ -12,11 +12,16 @@
    CT           CQ              MCH3
    CT           CR              MCH3
    CT           CT              MCH3
+   CT           C8              MCH3
+   CT           C4              MCH3
    CT           CV              MCH3
    CT           CW              MCH3
    CT           C*              MCH3
    CT           N               MCH3
    CT           S               MCH3
+   C3           CT              MCH3
+   C4           CT              MCH3
+   C8           CT              MCH3
 
 [ NH3 ]
 ; N3         sp3 N for charged amino groups
@@ -30,6 +35,7 @@
    N3           CQ              MNH3
    N3           CR              MNH3
    N3           CT              MNH3
+   N3           C3              MNH3
    N3           CV              MNH3
    N3           CW              MNH3
    N3           C*              MNH3

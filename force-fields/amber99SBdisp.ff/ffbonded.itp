@@ -136,10 +136,26 @@
 
 ; constraints for rigid CH3 groups
  MCH3   CT      2    0.166426
+ MCH3   C1      2    0.166426
+ MCH3   C3      2    0.166426
+ MCH3   C4      2    0.166426
+ MCH3   C5      2    0.166426
+ MCH3   C6      2    0.166426
+ MCH3   C7      2    0.166426
+ MCH3   C8      2    0.166426
+ MCH3   C9      2    0.166426
  MCH3   S       2    0.193875
  MCH3   MCH3    2    0.092163
 ; constraints for rigid NH3 groups
  MNH3   CT      2    0.158254
+ MNH3   C1      2    0.158254
+ MNH3   C3      2    0.158254
+ MNH3   C4      2    0.158254
+ MNH3   C5      2    0.158254
+ MNH3   C6      2    0.158254
+ MNH3   C7      2    0.158254
+ MNH3   C8      2    0.158254
+ MNH3   C9      2    0.158254
  MNH3   MNH3    2    0.080229
 
 ; angle-derived constraints for OH and SH groups in proteins
