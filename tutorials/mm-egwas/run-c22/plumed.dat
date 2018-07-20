@@ -47,7 +47,7 @@ PBMETAD ...
 ... PBMETAD
 
 # output from the collective variable
-PRINT FILE=COLVAR ARG=phi2,phi3,phi4,phi5,phi6,phi7,phi8,phi9,psi1,psi2,psi3,psi4,psi5,psi6,psi7,psi8,dihtrp_cacb,dihtrp_cbcg STRIDE=2000
+PRINT FILE=COLVAR ARG=rg,phi2,phi3,phi4,phi5,phi6,phi7,phi8,phi9,psi1,psi2,psi3,psi4,psi5,psi6,psi7,psi8,dihtrp_cacb,dihtrp_cbcg STRIDE=2000
 
 # EXPERIMENTAL DATA SECTION
 
@@ -70,7 +70,7 @@ RDC ...
     ARG=pb.bias
     NOISETYPE=MGAUSS REWEIGHT OPTSIGMAMEAN=SEM AVERAGING=200
     REGRES_ZERO=200
-    SIGMA0=5.0 SIGMA_MIN=0.0001 SIGMA_MAX=15.0 DSIGMA=0.1
+    SIGMA0=1.0 SIGMA_MIN=0.0001 SIGMA_MAX=5.0 DSIGMA=0.1
     WRITE_STRIDE=10000
 ... RDC
 
@@ -93,7 +93,7 @@ RDC ...
     ARG=pb.bias
     NOISETYPE=MGAUSS  REWEIGHT  OPTSIGMAMEAN=SEM AVERAGING=200
     REGRES_ZERO=200
-    SIGMA0=5.0 SIGMA_MIN=0.0001 SIGMA_MAX=15.0 DSIGMA=0.1
+    SIGMA0=1.0 SIGMA_MIN=0.0001 SIGMA_MAX=5.0 DSIGMA=0.1
     WRITE_STRIDE=10000
 ... RDC
 
@@ -145,21 +145,21 @@ METAINFERENCE ...
     ARG=(jhan\.j_.*),(jhahn\.j_.*),(jccg\.j.*),(jncg\.j.*),pb.bias
     PARARG=(jhan\.exp_.*),(jhahn\.exp_.*),(jccg\.exp.*),(jncg\.exp.*)
     NOISETYPE=MGAUSS REWEIGHT OPTSIGMAMEAN=SEM AVERAGING=200
-    SIGMA0=5.0 SIGMA_MIN=0.0001 SIGMA_MAX=15.0 DSIGMA=0.1
+    SIGMA0=2.5 SIGMA_MIN=0.0001 SIGMA_MAX=5.0 DSIGMA=0.1
     WRITE_STRIDE=10000
     LABEL=byj
 ... METAINFERENCE
 #
 # Chemical shifts
-cs: CS2BACKBONE ATOMS=1-111 DATADIR=data TEMPLATE=template.pdb DOSCORE ARG=pb.bias NOISETYPE=MOUTLIERS REWEIGHT OPTSIGMAMEAN=SEM AVERAGING=200 SIGMA0=5.0 SIGMA_MIN=0.0001 SIGMA_MAX=15.0 DSIGMA=0.1 WRITE_STRIDE=10000
+cs: CS2BACKBONE ATOMS=1-111 DATADIR=data TEMPLATE=template.pdb DOSCORE ARG=pb.bias NOISETYPE=MOUTLIERS REWEIGHT OPTSIGMAMEAN=SEM AVERAGING=200 SIGMA0=4.0 SIGMA_MIN=0.0001 SIGMA_MAX=5.0 DSIGMA=0.1 WRITE_STRIDE=10000
 mcs: BIASVALUE ARG=cs.score
 
 # output from METAINFERENCE
 FLUSH STRIDE=10000
-PRINT ARG=nh.score,nh.acceptSigma,nh.weight,nh.scale,(nh\.sigma.*),(nh\.sigmaMean.*)   STRIDE=2000 FILE=BAYES.RDC.NH
-PRINT ARG=caha.score,caha.acceptSigma,caha.weight,caha.scale,(caha\.sigma.*),(caha\.sigmaMean.*) STRIDE=2000 FILE=BAYES.RDC.CAHA
+PRINT ARG=nh.score,nh.acceptSigma,nh.weight,nh.scale,(nh\.sigma.*)   STRIDE=2000 FILE=BAYES.RDC.NH
+PRINT ARG=caha.score,caha.acceptSigma,caha.weight,caha.scale,(caha\.sigma.*) STRIDE=2000 FILE=BAYES.RDC.CAHA
 PRINT ARG=byj.*  STRIDE=2000 FILE=BAYES.J
-PRINT ARG=cs.score,cs.acceptSigma,cs.weight,(cs\.sigma.*),(cs\.sigmaMean.*)   STRIDE=2000 FILE=BAYES.CS
+PRINT ARG=cs.score,cs.acceptSigma,cs.weight,(cs\.sigma.*)   STRIDE=2000 FILE=BAYES.CS
 
 # Calculate weighted ensemble average
 ENSEMBLE ...
