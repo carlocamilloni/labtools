@@ -156,10 +156,10 @@ mcs: BIASVALUE ARG=cs.score
 
 # output from METAINFERENCE
 FLUSH STRIDE=10000
-PRINT ARG=nh.*   STRIDE=2000 FILE=BAYES.RDC.NH
-PRINT ARG=caha.* STRIDE=2000 FILE=BAYES.RDC.CAHA
+PRINT ARG=nh.score,nh.acceptSigma,nh.weight,nh.scale,(nh\.sigma.*),(nh\.sigmaMean.*)   STRIDE=2000 FILE=BAYES.RDC.NH
+PRINT ARG=caha.score,caha.acceptSigma,caha.weight,caha.scale,(caha\.sigma.*),(caha\.sigmaMean.*) STRIDE=2000 FILE=BAYES.RDC.CAHA
 PRINT ARG=byj.*  STRIDE=2000 FILE=BAYES.J
-PRINT ARG=cs.*   STRIDE=2000 FILE=BAYES.CS
+PRINT ARG=cs.score,cs.acceptSigma,cs.weight,(cs\.sigma.*),(cs\.sigmaMean.*)   STRIDE=2000 FILE=BAYES.CS
 
 # Calculate weighted ensemble average
 ENSEMBLE ...
