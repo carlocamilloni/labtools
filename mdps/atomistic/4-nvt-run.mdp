@@ -56,9 +56,6 @@ periodic_molecules       = no
 verlet-buffer-tolerance  = 0.001
 ; nblist cut-off        
 rlist                    = 0.9
-; long-range cut-off for switched potentials
-rlistlong                = -1
-nstcalclr                = -1
 
 ; OPTIONS FOR ELECTROSTATICS AND VDW
 ; Method for doing electrostatics
