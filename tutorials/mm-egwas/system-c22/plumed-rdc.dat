@@ -1,0 +1,62 @@
+# this is optional and tell to VIM that this is a PLUMED file
+# vim: ft=plumed
+# see comments just below this input file
+MOLINFO MOLTYPE=protein STRUCTURE=template.pdb
+WHOLEMOLECULES ENTITY0=1-111
+
+# RDCs (Grzesiek et al.)
+# xGAAWAASS
+RDC ...
+    ADDCOUPLINGS
+    GYROM=-72.5388
+    SCALE=0.0001
+    ATOMS1=18,19 COUPLING1=-5.4
+    ATOMS2=25,26 COUPLING2=-1.26
+    ATOMS3=35,36 COUPLING3=-5.22
+    ATOMS4=45,46 COUPLING4=-0.91
+    ATOMS5=69,70 COUPLING5=2.33
+    ATOMS6=79,80 COUPLING6=-2.88
+    ATOMS7=89,90 COUPLING7=-8.37
+    ATOMS8=100,101 COUPLING8=-3.78
+    LABEL=nh
+... RDC
+
+# ExAAWAASx
+RDC ...
+    ADDCOUPLINGS
+    GYROM=179.9319
+    SCALE=0.0001
+    ATOMS1=5,6 COUPLING1=12.95
+    ATOMS2=27,28 COUPLING2=11.5
+    ATOMS3=37,38 COUPLING3=21.42
+    ATOMS4=47,48 COUPLING4=-9.37
+    ATOMS5=71,72 COUPLING5=10.01
+    ATOMS6=81,82 COUPLING6=15.01
+    ATOMS7=91,92 COUPLING7=15.73
+    LABEL=caha
+... RDC
+
+# Calculate weighted ensemble average
+ENSEMBLE ...
+    ARG=(nh\.rdc_.*),(caha\.rdc_.*)
+    LABEL=ens
+... ENSEMBLE
+
+# We use the analogous function for all other observables
+STATS ...
+    ARG=(ens\.nh\.rdc_.*) PARARG=(nh\.exp_.*)
+    LABEL=nhst
+... STATS
+
+STATS ...
+    ARG=(ens\.caha\.rdc_.*) PARARG=(caha\.exp_.*)
+    LABEL=cahast
+... STATS
+
+# Restraint on the correlation
+b: RESTRAINT ARG=nhst.corr,caha.corr AT=1,1 KAPPA=0.,0. SLOPE=-200,-0
+
+PRINT ARG=nhst.*,cahast.* FILE=STATS STRIDE=2000
+
+ENDPLUMED
+

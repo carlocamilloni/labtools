@@ -1,0 +1,184 @@
+# this is optional and tell to VIM that this is a PLUMED file
+# vim: ft=plumed
+# see comments just below this input file
+MOLINFO MOLTYPE=protein STRUCTURE=template.pdb
+WHOLEMOLECULES ENTITY0=1-111
+
+# CVs, Psi9, Phi1 are not defined
+psi1: TORSION ATOMS=@psi-1 NOPBC
+psi2: TORSION ATOMS=@psi-2 NOPBC
+psi3: TORSION ATOMS=@psi-3 NOPBC
+psi4: TORSION ATOMS=@psi-4 NOPBC
+psi5: TORSION ATOMS=@psi-5 NOPBC
+psi6: TORSION ATOMS=@psi-6 NOPBC
+psi7: TORSION ATOMS=@psi-7 NOPBC
+psi8: TORSION ATOMS=@psi-8 NOPBC
+
+phi2: TORSION ATOMS=@phi-2 NOPBC
+phi3: TORSION ATOMS=@phi-3 NOPBC
+phi4: TORSION ATOMS=@phi-4 NOPBC
+phi5: TORSION ATOMS=@phi-5 NOPBC
+phi6: TORSION ATOMS=@phi-6 NOPBC
+phi7: TORSION ATOMS=@phi-7 NOPBC
+phi8: TORSION ATOMS=@phi-8 NOPBC
+phi9: TORSION ATOMS=@phi-9 NOPBC
+
+# Bulky Trp residue dihedral
+dihtrp_cacb: TORSION ATOMS=67,47,49,52
+dihtrp_cbcg: TORSION ATOMS=47,49,52,53
+
+gyr: GYRATION TYPE=RADIUS ATOMS=@CA-1,@CA-2,@CA-3,@CA-4,@CA-5,@CA-6,@CA-7,@CA-8,@CA-9 NOPBC
+
+# PBMetaD
+PBMETAD ...
+    LABEL=pb
+    ARG=phi2,phi3,phi4,phi5,phi6,phi7,phi8,phi9,psi1,psi2,psi3,psi4,psi5,psi6,psi7,psi8,dihtrp_cacb,dihtrp_cbcg
+    SIGMA=1000 
+    SIGMA_MIN=0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06
+    SIGMA_MAX=0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6
+    ADAPTIVE=DIFF
+    HEIGHT=0.5
+    PACE=200
+    BIASFACTOR=34
+    GRID_MIN=-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi
+    GRID_MAX=pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi
+    GRID_WSTRIDE=50000
+    WALKERS_MPI
+... PBMETAD
+
+# output from the collective variable
+PRINT FILE=COLVAR ARG=phi2,phi3,phi4,phi5,phi6,phi7,phi8,phi9,psi1,psi2,psi3,psi4,psi5,psi6,psi7,psi8,dihtrp_cacb,dihtrp_cbcg STRIDE=2000
+
+# EXPERIMENTAL DATA SECTION
+
+# RDCs (Grzesiek et al.)
+# xGAAWAASS
+RDC ...
+    ADDCOUPLINGS
+    GYROM=-72.5388
+    SCALE=0.0001
+    ATOMS1=18,19 COUPLING1=-5.4
+    ATOMS2=25,26 COUPLING2=-1.26
+    ATOMS3=35,36 COUPLING3=-5.22
+    ATOMS4=45,46 COUPLING4=-0.91
+    ATOMS5=69,70 COUPLING5=2.33
+    ATOMS6=79,80 COUPLING6=-2.88
+    ATOMS7=89,90 COUPLING7=-8.37
+    ATOMS8=100,101 COUPLING8=-3.78
+    LABEL=nh
+    DOSCORE
+    ARG=pb.bias
+    NOISETYPE=MGAUSS REWEIGHT OPTSIGMAMEAN=SEM AVERAGING=200
+    REGRES_ZERO=200
+    SIGMA0=5.0 SIGMA_MIN=0.0001 SIGMA_MAX=15.0 DSIGMA=0.1
+    WRITE_STRIDE=10000
+... RDC
+
+mnh: BIASVALUE ARG=nh.score 
+
+# ExAAWAASx
+RDC ...
+    ADDCOUPLINGS
+    GYROM=179.9319
+    SCALE=0.0001
+    ATOMS1=5,6 COUPLING1=12.95
+    ATOMS2=27,28 COUPLING2=11.5
+    ATOMS3=37,38 COUPLING3=21.42
+    ATOMS4=47,48 COUPLING4=-9.37
+    ATOMS5=71,72 COUPLING5=10.01
+    ATOMS6=81,82 COUPLING6=15.01
+    ATOMS7=91,92 COUPLING7=15.73
+    LABEL=caha
+    DOSCORE
+    ARG=pb.bias
+    NOISETYPE=MGAUSS  REWEIGHT  OPTSIGMAMEAN=SEM AVERAGING=200
+    REGRES_ZERO=200
+    SIGMA0=5.0 SIGMA_MIN=0.0001 SIGMA_MAX=15.0 DSIGMA=0.1
+    WRITE_STRIDE=10000
+... RDC
+
+mcaha: BIASVALUE ARG=caha.score 
+
+# xGxAWxASx
+JCOUPLING ...
+    ADDCOUPLINGS
+    TYPE=HAN
+    ATOMS1=@psi-2 COUPLING1=-0.49
+    ATOMS2=@psi-4 COUPLING2=-0.54
+    ATOMS3=@psi-5 COUPLING3=-0.53
+    ATOMS4=@psi-7 COUPLING4=-0.39
+    ATOMS5=@psi-8 COUPLING5=-0.39
+    LABEL=jhan
+... JCOUPLING
+
+# xxAAWAASS
+JCOUPLING ...
+    ADDCOUPLINGS
+    TYPE=HAHN
+    ATOMS1=@phi-2 COUPLING1=6.05
+    ATOMS2=@phi-3 COUPLING2=5.95
+    ATOMS3=@phi-4 COUPLING3=6.44
+    ATOMS4=@phi-5 COUPLING4=6.53
+    ATOMS5=@phi-6 COUPLING5=5.93
+    ATOMS6=@phi-7 COUPLING6=6.98
+    ATOMS7=@phi-8 COUPLING7=7.16
+    LABEL=jhahn
+... JCOUPLING
+
+# xxxxWxxxx
+JCOUPLING ...
+    ADDCOUPLINGS
+    TYPE=CCG
+    ATOMS1=@chi1-5 COUPLING1=1.59
+    LABEL=jccg
+... JCOUPLING
+
+# xxxxWxxxx
+JCOUPLING ...
+    ADDCOUPLINGS
+    TYPE=NCG
+    ATOMS1=@chi1-5 COUPLING1=1.21
+    LABEL=jncg
+... JCOUPLING
+
+METAINFERENCE ...
+    ARG=(jhan\.j_.*),(jhahn\.j_.*),(jccg\.j.*),(jncg\.j.*),pb.bias
+    PARARG=(jhan\.exp_.*),(jhahn\.exp_.*),(jccg\.exp.*),(jncg\.exp.*)
+    NOISETYPE=MGAUSS REWEIGHT OPTSIGMAMEAN=SEM AVERAGING=200
+    SIGMA0=5.0 SIGMA_MIN=0.0001 SIGMA_MAX=15.0 DSIGMA=0.1
+    WRITE_STRIDE=10000
+    LABEL=byj
+... METAINFERENCE
+#
+# Chemical shifts
+cs: CS2BACKBONE ATOMS=1-111 DATADIR=data TEMPLATE=template.pdb DOSCORE ARG=pb.bias NOISETYPE=MOUTLIERS REWEIGHT OPTSIGMAMEAN=SEM AVERAGING=200 SIGMA0=5.0 SIGMA_MIN=0.0001 SIGMA_MAX=15.0 DSIGMA=0.1 WRITE_STRIDE=10000
+mcs: BIASVALUE ARG=cs.score
+
+# output from METAINFERENCE
+FLUSH STRIDE=10000
+PRINT ARG=nh.*   STRIDE=2000 FILE=BAYES.RDC.NH
+PRINT ARG=caha.* STRIDE=2000 FILE=BAYES.RDC.CAHA
+PRINT ARG=byj.*  STRIDE=2000 FILE=BAYES.J
+PRINT ARG=cs.*   STRIDE=2000 FILE=BAYES.CS
+
+# Calculate weighted ensemble average
+ENSEMBLE ...
+    ARG=(nh\.rdc_.*),(caha\.rdc_.*),pb.bias REWEIGHT
+    LABEL=ens
+... ENSEMBLE
+
+# We use the analogous function for all other observables
+STATS ...
+    ARG=(ens\.nh\.rdc_.*) PARARG=(nh\.exp_.*)
+    LABEL=nhst
+... STATS
+
+STATS ...
+    ARG=(ens\.caha\.rdc_.*) PARARG=(caha\.exp_.*)
+    LABEL=cahast
+... STATS
+
+PRINT ARG=nhst.*,cahast.* FILE=STATS STRIDE=2000
+
+ENDPLUMED
+
