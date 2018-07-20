@@ -47,7 +47,7 @@ PBMETAD ...
 ... PBMETAD
 
 # output from the collective variable
-PRINT FILE=COLVAR ARG=rg,phi2,phi3,phi4,phi5,phi6,phi7,phi8,phi9,psi1,psi2,psi3,psi4,psi5,psi6,psi7,psi8,dihtrp_cacb,dihtrp_cbcg STRIDE=2000
+PRINT FILE=COLVAR ARG=gyr,phi2,phi3,phi4,phi5,phi6,phi7,phi8,phi9,psi1,psi2,psi3,psi4,psi5,psi6,psi7,psi8,dihtrp_cacb,dihtrp_cbcg STRIDE=2000
 
 # EXPERIMENTAL DATA SECTION
 
