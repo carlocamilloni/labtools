@@ -208,7 +208,7 @@ int gmx_mdmat(int argc, char *argv[])
         { efXPM, "-mean", "dm", ffWRITE },
         { efXPM, "-frames", "dmf", ffOPTWR },
         { efXVG, "-no", "num", ffOPTWR },
-        { efDAT, "-w", "weights", ffOPTRD }
+        { efDAT, "-ww", "weights", ffOPTRD }
     };
 #define NFILE asize(fnm)
 
@@ -328,7 +328,7 @@ int gmx_mdmat(int argc, char *argv[])
 
     gpbc = gmx_rmpbc_init(&top.idef, ePBC, trxnat);
 
-    if(opt2bSet("-w",NFILE,fnm)) {
+    if(opt2bSet("-ww",NFILE,fnm)) {
       fp = fopen(ftp2fn(efDAT,NFILE,fnm),"r");
       use_weights=1;
     }
@@ -373,6 +373,7 @@ int gmx_mdmat(int argc, char *argv[])
     while (read_next_x(oenv, status, &t, x, box));
 
     fclose(fp);
+    if(use_weights) fprintf(stdout, "total weights is %lf\n", nframes);
 
     fprintf(stderr, "\n");
     close_trx(status);
