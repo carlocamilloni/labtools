@@ -262,7 +262,7 @@ int gmx_rmsf(int argc, char *argv[])
     double           *rmsf, invcount, totmass, ww;
     int               d;
     int               use_weights=0;
-    real              count = 0;
+    double            count = 0;
     rvec              xcm;
     gmx_rmpbc_t       gpbc = nullptr;
 
