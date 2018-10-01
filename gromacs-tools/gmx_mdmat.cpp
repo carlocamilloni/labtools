@@ -208,6 +208,7 @@ int gmx_mdmat(int argc, char *argv[])
         { efXPM, "-mean", "dm", ffWRITE },
         { efXPM, "-frames", "dmf", ffOPTWR },
         { efXVG, "-no", "num", ffOPTWR },
+        { efDAT, "-w", "weights", ffOPTRD }
     };
 #define NFILE asize(fnm)
 
