@@ -3,15 +3,30 @@
 SOL		1
 
 [ atoms ]
-; 	at type	      res nr  res name	at name	      cg nr	charge	   mass
-1        OW_tip4p2005 	1	SOL	 OW		1	0        16.00000
-2	HW       	1	SOL	HW2		1	0.5564 	  1.00800
-3	HW	        1	SOL	HW3		1	0.5564 	  1.00800
-4	MW		1	SOL	MW4		1      -1.1128    0.00000
+; id  at type     res nr  res name  at name  cg nr  charge    mass
+  1   OW_tip4p2005  1     SOL       OW       1       0        16.00000
+  2   HW       	    1     SOL       HW2      1       0.55640   1.00800
+  3   HW	    1     SOL       HW3      1       0.55640   1.00800
+  4   MW            1     SOL       MW4      1      -1.11280   0.00000
+
+#ifndef FLEXIBLE
 
 [ settles ]
 ; i	funct	doh	dhh ---> same as standard tip4p
 1	1	0.09572	0.15139
+
+#else
+[ bonds ]
+; i     j       funct   length  force.c.
+1       2       1       0.09572 502416.0 0.09572        502416.0 
+1       3       1       0.09572 502416.0 0.09572        502416.0 
+        
+[ angles ]
+; i     j       k       funct   angle   force.c.
+2       1       3       1       104.52  628.02  104.52  628.02  
+
+#endif
+
 
 [ virtual_sites3 ]
 ; Dummy from			funct	a		b
