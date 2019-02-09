@@ -136,6 +136,7 @@
 
 ; constraints for rigid CH3 groups
  MCH3   CT      2    0.166426
+ MCH3   C       2    0.166426
  MCH3   C1      2    0.166426
  MCH3   C3      2    0.166426
  MCH3   C4      2    0.166426
@@ -144,6 +145,7 @@
  MCH3   C7      2    0.166426
  MCH3   C8      2    0.166426
  MCH3   C9      2    0.166426
+ MCH3   N       2    0.158254
  MCH3   S       2    0.193875
  MCH3   MCH3    2    0.092163
 ; constraints for rigid NH3 groups

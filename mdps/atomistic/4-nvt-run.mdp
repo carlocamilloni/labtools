@@ -73,7 +73,7 @@ vdw-modifier             = Potential-shift-Verlet
 rvdw-switch              = 0
 rvdw                     = 0.9
 ; Apply long range dispersion corrections for Energy and Pressure
-DispCorr                 = Ener
+DispCorr                 = no 
 ; Extension of the potential lookup tables beyond the cut-off
 table-extension          = 1
 ; Separate tables between energy group pairs

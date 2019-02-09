@@ -1,10 +1,3 @@
-;
-;	File 'mdout.mdp' was generated
-;	By user: carlo (501)
-;	On host: Carlos-MacBook-Pro-2.local
-;	At date: Tue Apr 28 22:42:58 2015
-;
-
 ; VARIOUS PREPROCESSING OPTIONS
 ; Preprocessor information: use cpp syntax.
 ; e.g.: -I/home/joe/doe -I/home/mary/roe
@@ -16,8 +9,8 @@ define                   =
 integrator               = md
 ; Start time and timestep in ps
 tinit                    = 0
-dt                       = 0.002
-nsteps                   = 100000 
+dt                       = 0.005
+nsteps                   = -1 
 ; For exact run continuation or redoing part of a run
 init_step                = 0
 ; Part index is updated automatically on checkpointing (keeps files separate)
@@ -25,7 +18,7 @@ simulation_part          = 1
 ; mode for center of mass motion removal
 comm-mode                = Linear
 ; number of steps for center of mass motion removal
-nstcomm                  = 20
+nstcomm                  = 10
 ; group(s) for center of mass motion removal
 comm-grps                = 
 
@@ -37,9 +30,9 @@ nstfout                  = 0
 ; Output frequency for energies to log file and energy file
 nstlog                   = 10000
 nstcalcenergy            = -1
-nstenergy                = 2500
+nstenergy                = 5000
 ; Output frequency and precision for .xtc file
-nstxout-compressed       = 2500
+nstxout-compressed       = 5000
 compressed-x-precision   = 1000
 ; This selects the subset of atoms for the compressed
 ; trajectory file. You can select multiple groups. By
@@ -52,7 +45,7 @@ energygrps               =
 ; cut-off scheme (Verlet: particle based cut-offs, group: using charge groups)
 cutoff-scheme            = Verlet
 ; nblist update frequency
-nstlist                  = 20
+nstlist                  = 10
 ; ns algorithm (simple or grid)
 ns_type                  = grid
 ; Periodic boundary conditions: xyz, no, xy
@@ -80,7 +73,7 @@ vdw-modifier             = Potential-shift-Verlet
 rvdw-switch              = 0
 rvdw                     = 0.9
 ; Apply long range dispersion corrections for Energy and Pressure
-DispCorr                 = EnerPres 
+DispCorr                 = 
 ; Extension of the potential lookup tables beyond the cut-off
 table-extension          = 1
 ; Separate tables between energy group pairs
@@ -111,7 +104,7 @@ tc-grps                  = system
 tau_t                    = 0.2
 ref_t                    = _TEMP_ 
 ; pressure coupling     
-Pcoupl                   = berendsen 
+Pcoupl                   = No
 Pcoupltype               = isotropic
 nstpcouple               = -1
 ; Time constant (ps), compressibility (1/bar) and reference P (bar)
@@ -128,6 +121,7 @@ gen_seed                 = -1
 
 ; OPTIONS FOR BONDS    
 constraints              = all-bonds
+;constraints              = h-bonds
 ; Type of constraint algorithm
 constraint-algorithm     = Lincs
 ; Do not constrain the start configuration
