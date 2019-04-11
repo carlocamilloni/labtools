@@ -372,8 +372,7 @@ int gmx_mdmat(int argc, char *argv[])
     }
     while (read_next_x(oenv, status, &t, x, box));
 
-    fclose(fp);
-    if(use_weights) fprintf(stdout, "total weights is %lf\n", nframes);
+    if(use_weights) {fclose(fp); fprintf(stdout, "total weights is %lf\n", nframes); }
 
     fprintf(stderr, "\n");
     close_trx(status);
