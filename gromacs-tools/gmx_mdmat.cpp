@@ -138,7 +138,7 @@ static void calc_mat(int nres, int natoms, int rndx[],
                 nmat[resi][j]++;
                 nmat[resj][i]++;
             }
-            if((r2 < cdist2)&&(abs(resind[resi]-resind[resj])>1)) tmat[i][j]+=ww;
+            if((r2 < cdist2)&&(abs(resind[resi]-resind[resj])>1)) { tmat[i][j]+=ww; tmat[j][i]+=ww; }
             mdmat[resi][resj] = std::min(r2, mdmat[resi][resj]);
         }
     }
