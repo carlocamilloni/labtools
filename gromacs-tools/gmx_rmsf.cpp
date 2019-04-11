@@ -415,9 +415,8 @@ int gmx_rmsf(int argc, char *argv[])
     }
     while (read_next_x(oenv, status, &t, x, box));
     close_trx(status);
-    fclose(fp);
 
-    if(use_weights) fprintf(stdout, "total weights is %lf\n", count);
+    if(use_weights) {fclose(fp); fprintf(stdout, "total weights is %lf\n", count);}
 
     if (bFit)
     {
