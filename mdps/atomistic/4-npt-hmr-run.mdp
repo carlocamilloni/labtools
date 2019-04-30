@@ -18,7 +18,7 @@ simulation_part          = 1
 ; mode for center of mass motion removal
 comm-mode                = Linear
 ; number of steps for center of mass motion removal
-nstcomm                  = 10
+nstcomm                  = 50
 ; group(s) for center of mass motion removal
 comm-grps                = 
 
