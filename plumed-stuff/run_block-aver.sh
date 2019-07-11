@@ -1,5 +1,3 @@
-temp=2.49
-
 infile=$1	# input file, it must contain at least 1 CV in field $field and the last column is a weight
 field=$2
 NR=$3		# number of replica
