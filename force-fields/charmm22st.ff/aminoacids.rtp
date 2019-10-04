@@ -1685,3 +1685,12 @@
  [ impropers ]
         N       -C      CH3     HN
         -C      CH3     N       -O
+
+
+[ CL ]
+ [ atoms ]
+   CL     CLA         -1.00000     1
+
+[ NA ]
+ [ atoms ]
+   NA     SOD          1.00000     1
