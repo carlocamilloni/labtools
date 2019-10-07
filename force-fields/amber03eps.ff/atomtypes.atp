@@ -60,6 +60,7 @@ HW_tip4pew         1.00800      ; tip4pEW HW
 OW_tip4pew        16.00000      ; tip4pEW OW
 HW_tip4p           1.00800      ; tip4p HW
 OW_tip4p          16.00000      ; tip4p OW
+OW_tip4pEps          16.00000      ; tip4p OW
 HW_tip5p           1.00800      ; tip5p HW
 OW_tip5p          16.00000      ; tip5p OW
 MW                 0.00000      ; Virtual site for tip4p/5p water point charge
