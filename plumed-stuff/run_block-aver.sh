@@ -16,8 +16,9 @@ if [ -f "errweight.cv$field.blocks" ]; then mv errweight.cv$field.blocks errweig
 awk -v field=$field '{if($1!="#!") print $field, $NF}' $infile > cv1w
 maxl=`wc -l cv1w | awk '{printf("%i\n", $1)}'`
 
-max=`sort -k1 -n cv1w | tail -1 | awk '{print $1}'`
-min=`sort -k1 -n -r cv1w | tail -1 | awk '{print $1}'`
+max=`sort -k1 -g cv1w | tail -1 | awk '{print $1}'`
+min=`sort -k1 -g -r cv1w | tail -1 | awk '{print $1}'`
+
 echo "fes plot from " $min " to " $max " with 51 bins and " $temp " energy units " 
 
 
