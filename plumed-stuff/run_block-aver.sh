@@ -30,9 +30,11 @@ for ((interval=20;interval>0;interval--)); do
 
 	# error
 	a=`awk '{tot+=$3}END{print tot/NR}' fes.cv$field.$i.dat`;
-       	echo $i $a >> err.cv$field.blocks
+	aa=`awk '{tot+=$4}END{print tot/NR}' fes.cv$field.$i.dat`;
+       	echo $i $a $aa >> err.cv$field.blocks
 	b=`awk -v kt=$temp '{tot+=$3*exp(-$2/kt);n+=exp(-$2/kt)}END{print tot/n}' fes.cv$field.$i.dat`; 
-	echo $i $b >> errweight.cv$field.blocks
+	bb=`awk -v kt=$temp '{tot+=$4*exp(-$2/kt);n+=exp(-$2/kt)}END{print tot/n}' fes.cv$field.$i.dat`; 
+	echo $i $b $bb >> errweight.cv$field.blocks
 	
 done
 mv cv1w cv$field.dat;

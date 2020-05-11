@@ -78,7 +78,7 @@ ndata = len(cv_list)
 nblock = int(ndata/BSIZE_)
 
 # prepare histo dictionaries
-histo_ave = {} ; histo_ave2 = {};
+histo_ave = {} ; histo_ave2 = {}; hblock = {};
 
 # cycle on blocks
 for iblock in range(0, nblock):
@@ -97,9 +97,11 @@ for iblock in range(0, nblock):
         if key in histo_ave: 
            histo_ave[key]   += histo[key]
            histo_ave2[key]  += histo[key] * histo[key]
+           if(hblock[key] < iblock+1): hblock[key] += 1
         else:
            histo_ave[key]   = histo[key]
            histo_ave2[key]  = histo[key] * histo[key]
+           hblock[key] = 1
 
 # print out fes and error 
 log = open("fes."+str(BSIZE_)+".dat", "w")
@@ -134,8 +136,12 @@ for i in range(0, nbins):
        # free energy and error
        fes = -KBT_ * math.log(aveh)
        errf = KBT_ / aveh * errh 
+       nhb = hblock[key]
        # printout
-       log.write("   %12.6lf %12.6lf\n" % (fes, errf))
+       if(nhb > 1):
+          log.write("   %12.6lf %12.6lf %12.6lf\n" % (fes, errf, (errf*math.sqrt(2.0/(nhb-1)))))
+       else:
+          log.write("   %12.6lf %12.6lf     Infinity\n" % (fes, errf))
     else:
        log.write("       Infinity\n")
 log.close()
