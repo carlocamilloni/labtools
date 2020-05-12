@@ -103,6 +103,8 @@ for iblock in range(0, nblock):
            histo_ave2[key]  = histo[key] * histo[key]
            hblock[key] = 1
 
+max_histo=max(list(histo_ave.values()))
+ 
 # print out fes and error 
 log = open("fes."+str(BSIZE_)+".dat", "w")
 # this is needed to add a blank line
@@ -134,8 +136,8 @@ for i in range(0, nbins):
        # error
        errh = math.sqrt( s2h / nb )
        # free energy and error
-       fes = -KBT_ * math.log(aveh)
-       errf = KBT_ / aveh * errh 
+       fes = -KBT_ * math.log(aveh) + KBT_ * math.log(max_histo / nb)
+       errf = KBT_ / aveh * errh
        nhb = hblock[key]
        # printout
        if(nhb > 1):
