@@ -49,8 +49,10 @@
 #include "gromacs/math/functions.h"
 #include "gromacs/math/units.h"
 #include "gromacs/math/vec.h"
-#include "gromacs/mdtypes/forcerec.h"
+#include "gromacs/mdlib/mdebin.h"
+#include "gromacs/mdtypes/enerdata.h"
 #include "gromacs/mdtypes/md_enums.h"
+#include "gromacs/trajectory/energyframe.h"
 #include "gromacs/utility/arraysize.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"
@@ -282,7 +284,7 @@ int gmx_enemat(int argc, char *argv[])
 
         if (timecheck == 0)
         {
-#define DONTSKIP(cnt) (skip) ? ((cnt % skip) == 0) : TRUE
+#define DONTSKIP(cnt) (skip) ? (((cnt) % skip) == 0) : TRUE
 
             if (bCont)
             {
@@ -337,9 +339,9 @@ int gmx_enemat(int argc, char *argv[])
     {
         groupnr[i] = i+1;
     }
-    rlo.r  = 1.0, rlo.g  = 0.0, rlo.b  = 0.0;
-    rmid.r = 1.0, rmid.g = 1.0, rmid.b = 1.0;
-    rhi.r  = 0.0, rhi.g  = 0.0, rhi.b  = 1.0;
+    rlo.r  = 1.0; rlo.g  = 0.0; rlo.b  = 0.0;
+    rmid.r = 1.0; rmid.g = 1.0; rmid.b = 1.0;
+    rhi.r  = 0.0; rhi.g  = 0.0; rhi.b  = 1.0;
     if (bMeanEmtx)
     {
         snew(e, ngroups);
