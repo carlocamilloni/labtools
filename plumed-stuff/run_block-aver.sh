@@ -29,8 +29,8 @@ for ((interval=20;interval>0;interval--)); do
 	mv fes.$i.dat fes.cv$field.$i.dat;
 
 	# error
-	a=`awk '{if($2<10*kt) {tot+=$3;n++}}END{print tot/n}' fes.cv$field.$i.dat`;
-	aa=`awk '{if($2<10*kt) {tot+=$4; n++}}END{print tot/n}' fes.cv$field.$i.dat`;
+	a=`awk -v kt=$temp '{if($2<10*kt) {tot+=$3;n++}}END{print tot/n}' fes.cv$field.$i.dat`;
+	aa=`awk -v kt=$temp '{if($2<10*kt) {tot+=$4; n++}}END{print tot/n}' fes.cv$field.$i.dat`;
        	echo $i $a $aa >> err.cv$field.blocks
 	b=`awk -v kt=$temp '{if($2<10*kt) {tot+=$3*exp(-$2/kt);n+=exp(-$2/kt)}}END{print tot/n}' fes.cv$field.$i.dat`; 
 	bb=`awk -v kt=$temp '{if($2<10*kt) {tot+=$4*exp(-$2/kt);n+=exp(-$2/kt)}}END{print tot/n}' fes.cv$field.$i.dat`; 
