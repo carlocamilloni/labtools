@@ -1,0 +1,4 @@
+# 2 is column 2 in cv-weights.dat
+# 8 is the number of replicas in a multiple replica simulations that have been concatenated together
+# 2.49 the temperature in energy units
+./run_block-aver.sh cv-weights.dat 2 8 2.49
