@@ -90,8 +90,6 @@ for iblock in range(0, nblock):
     for i in range(i0, i1):
         if cv_list[i] in histo: histo[cv_list[i]] += w_list[i]
         else:                   histo[cv_list[i]]  = w_list[i] 
-    # calculate average histo in block
-    for key in histo: histo[key] /= float(BSIZE_)
     # add to global histo dictionary
     for key in histo: 
         if key in histo_ave: 

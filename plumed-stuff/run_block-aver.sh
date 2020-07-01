@@ -25,15 +25,15 @@ echo "fes plot from " $min " to " $max " with 51 bins and " $temp " energy units
 for ((interval=20;interval>0;interval--)); do
 	i=`echo $interval | awk '{printf("%i\n", '$maxl'/($1*'$NR'))}'`
 	echo -e "\nEach of the $NR replica is divided in $interval blocks, with block-length $i"
-	python do_block_fes.py cv1w 1 $min $max 51 $temp $i; 
+	python do_block_fes.py cv1w 1 $min $max 101 $temp $i; 
 	mv fes.$i.dat fes.cv$field.$i.dat;
 
 	# error
-	a=`awk '{tot+=$3}END{print tot/NR}' fes.cv$field.$i.dat`;
-	aa=`awk '{tot+=$4}END{print tot/NR}' fes.cv$field.$i.dat`;
+	a=`awk '{if($2<10*kt) {tot+=$3;n++}}END{print tot/n}' fes.cv$field.$i.dat`;
+	aa=`awk '{if($2<10*kt) {tot+=$4; n++}}END{print tot/n}' fes.cv$field.$i.dat`;
        	echo $i $a $aa >> err.cv$field.blocks
-	b=`awk -v kt=$temp '{tot+=$3*exp(-$2/kt);n+=exp(-$2/kt)}END{print tot/n}' fes.cv$field.$i.dat`; 
-	bb=`awk -v kt=$temp '{tot+=$4*exp(-$2/kt);n+=exp(-$2/kt)}END{print tot/n}' fes.cv$field.$i.dat`; 
+	b=`awk -v kt=$temp '{if($2<10*kt) {tot+=$3*exp(-$2/kt);n+=exp(-$2/kt)}}END{print tot/n}' fes.cv$field.$i.dat`; 
+	bb=`awk -v kt=$temp '{if($2<10*kt) {tot+=$4*exp(-$2/kt);n+=exp(-$2/kt)}}END{print tot/n}' fes.cv$field.$i.dat`; 
 	echo $i $b $bb >> errweight.cv$field.blocks
 	
 done
