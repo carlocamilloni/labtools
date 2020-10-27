@@ -95,7 +95,7 @@ epsilon_surface          = 0
 ; OPTIONS FOR WEAK COUPLING ALGORITHMS
 ; Temperature coupling  
 Tcoupl                   = v-rescale
-nsttcouple               = -1
+nsttcouple               = 5 
 nh-chain-length          = 10
 print-nose-hoover-chain-variables = no
 ; Groups to couple separately
@@ -106,7 +106,7 @@ ref_t                    = _TEMP_
 ; pressure coupling     
 Pcoupl                   = No
 Pcoupltype               = isotropic
-nstpcouple               = -1
+nstpcouple               = 5 
 ; Time constant (ps), compressibility (1/bar) and reference P (bar)
 tau_p                    = 1.0
 compressibility          = 4.5e-5
