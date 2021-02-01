@@ -1,10 +1,3 @@
-;
-;	File 'mdout.mdp' was generated
-;	By user: carlo (501)
-;	On host: Carlos-MacBook-Pro-2.local
-;	At date: Tue Apr 28 22:42:58 2015
-;
-
 ; VARIOUS PREPROCESSING OPTIONS
 ; Preprocessor information: use cpp syntax.
 ; e.g.: -I/home/joe/doe -I/home/mary/roe
@@ -17,11 +10,14 @@ integrator               = md
 ; Start time and timestep in ps
 tinit                    = 0
 dt                       = 0.002
-nsteps                   = 100000 
+nsteps                   = -1 
 ; For exact run continuation or redoing part of a run
 init_step                = 0
 ; Part index is updated automatically on checkpointing (keeps files separate)
 simulation_part          = 1
+; Multiple time-stepping
+mts                      = yes
+mts-level2-forces        = longrange-nonbonded nonbonded ; pair dihedral 
 ; mode for center of mass motion removal
 comm-mode                = Linear
 ; number of steps for center of mass motion removal
@@ -35,11 +31,11 @@ nstxout                  = 50000
 nstvout                  = 50000
 nstfout                  = 0
 ; Output frequency for energies to log file and energy file
-nstlog                   = 10000
-nstcalcenergy            = -1
-nstenergy                = 2500
+nstlog                   = 50000
+nstcalcenergy            = 100
+nstenergy                = 5000
 ; Output frequency and precision for .xtc file
-nstxout-compressed       = 2500
+nstxout-compressed       = 5000
 compressed-x-precision   = 1000
 ; This selects the subset of atoms for the compressed
 ; trajectory file. You can select multiple groups. By
@@ -49,12 +45,10 @@ compressed-x-grps        = protein
 energygrps               = 
 
 ; NEIGHBORSEARCHING PARAMETERS
-; cut-off scheme (Verlet: particle based cut-offs, group: using charge groups)
+; cut-off scheme (Verlet: particle based cut-offs)
 cutoff-scheme            = Verlet
 ; nblist update frequency
 nstlist                  = 20
-; ns algorithm (simple or grid)
-ns_type                  = grid
 ; Periodic boundary conditions: xyz, no, xy
 pbc                      = xyz
 periodic_molecules       = no
@@ -62,25 +56,25 @@ periodic_molecules       = no
 ; a value of -1 means: use rlist
 verlet-buffer-tolerance  = 0.001
 ; nblist cut-off        
-rlist                    = 0.9
+rlist                    = 1.0
 
 ; OPTIONS FOR ELECTROSTATICS AND VDW
 ; Method for doing electrostatics
 coulombtype              = pme
-coulomb-modifier         = Potential-shift-Verlet
+coulomb-modifier         = Potential-shift
 rcoulomb-switch          = 0
-rcoulomb                 = 0.9
+rcoulomb                 = 1.0
 ; Relative dielectric constant for the medium and the reaction field
 epsilon_r                = 1
 epsilon_rf               = 1
 ; Method for doing Van der Waals
 vdw-type                 = cut-off
-vdw-modifier             = Potential-shift-Verlet
+vdw-modifier             = Potential-shift
 ; cut-off lengths       
 rvdw-switch              = 0
-rvdw                     = 0.9
+rvdw                     = 1.0
 ; Apply long range dispersion corrections for Energy and Pressure
-DispCorr                 = EnerPres 
+DispCorr                 = no 
 ; Extension of the potential lookup tables beyond the cut-off
 table-extension          = 1
 ; Separate tables between energy group pairs
@@ -111,7 +105,7 @@ tc-grps                  = system
 tau_t                    = 0.2
 ref_t                    = _TEMP_ 
 ; pressure coupling     
-Pcoupl                   = berendsen 
+Pcoupl                   = c-rescale 
 Pcoupltype               = isotropic
 nstpcouple               = -1
 ; Time constant (ps), compressibility (1/bar) and reference P (bar)
@@ -127,7 +121,7 @@ gen_temp                 =
 gen_seed                 = -1
 
 ; OPTIONS FOR BONDS    
-constraints              = all-bonds
+constraints              = h-bonds
 ; Type of constraint algorithm
 constraint-algorithm     = Lincs
 ; Do not constrain the start configuration

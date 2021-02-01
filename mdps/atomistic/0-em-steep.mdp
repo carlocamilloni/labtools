@@ -43,7 +43,7 @@ nbfgscorr                = 10
 
 ; OUTPUT CONTROL OPTIONS
 ; Output frequency for coords (x), velocities (v) and forces (f)
-nstxout                  = 1000
+nstxout                  = 10
 nstvout                  = 0 
 nstfout                  = 0
 ; Output frequency for energies to log file and energy file
@@ -74,25 +74,25 @@ periodic_molecules       = no
 ; a value of -1 means: use rlist
 verlet-buffer-tolerance  = 0.005
 ; nblist cut-off        
-rlist                    = 0.9
+rlist                    = 1.0
 
 ; OPTIONS FOR ELECTROSTATICS AND VDW
 ; Method for doing electrostatics
 coulombtype              = pme
-coulomb-modifier         = Potential-shift-Verlet
+coulomb-modifier         = Potential-shift
 rcoulomb-switch          = 0
-rcoulomb                 = 0.9
+rcoulomb                 = 1.0
 ; Relative dielectric constant for the medium and the reaction field
 epsilon_r                = 1
 epsilon_rf               = 1
 ; Method for doing Van der Waals
 vdw-type                 = cut-off
-vdw-modifier             = Potential-shift-Verlet
+vdw-modifier             = Potential-shift
 ; cut-off lengths       
 rvdw-switch              = 0
-rvdw                     = 0.9
+rvdw                     = 1.0
 ; Apply long range dispersion corrections for Energy and Pressure
-DispCorr                 = No
+DispCorr                 = no
 ; Extension of the potential lookup tables beyond the cut-off
 table-extension          = 1
 ; Separate tables between energy group pairs

@@ -35,11 +35,11 @@ nstxout                  = 50000
 nstvout                  = 50000
 nstfout                  = 0
 ; Output frequency for energies to log file and energy file
-nstlog                   = 10000
-nstcalcenergy            = -1
-nstenergy                = 2500
+nstlog                   = 50000
+nstcalcenergy            = 100
+nstenergy                = 5000
 ; Output frequency and precision for .xtc file
-nstxout-compressed       = 2500
+nstxout-compressed       = 5000
 compressed-x-precision   = 1000
 ; This selects the subset of atoms for the compressed
 ; trajectory file. You can select multiple groups. By
@@ -62,25 +62,25 @@ periodic_molecules       = no
 ; a value of -1 means: use rlist
 verlet-buffer-tolerance  = 0.001
 ; nblist cut-off        
-rlist                    = 0.9
+rlist                    = 1.0
 
 ; OPTIONS FOR ELECTROSTATICS AND VDW
 ; Method for doing electrostatics
 coulombtype              = pme
-coulomb-modifier         = Potential-shift-Verlet
+coulomb-modifier         = Potential-shift
 rcoulomb-switch          = 0
-rcoulomb                 = 0.9
+rcoulomb                 = 1.0
 ; Relative dielectric constant for the medium and the reaction field
 epsilon_r                = 1
 epsilon_rf               = 1
 ; Method for doing Van der Waals
 vdw-type                 = cut-off
-vdw-modifier             = Potential-shift-Verlet
+vdw-modifier             = Potential-shift
 ; cut-off lengths       
 rvdw-switch              = 0
-rvdw                     = 0.9
+rvdw                     = 1.0
 ; Apply long range dispersion corrections for Energy and Pressure
-DispCorr                 = No
+DispCorr                 = no
 ; Extension of the potential lookup tables beyond the cut-off
 table-extension          = 1
 ; Separate tables between energy group pairs
@@ -101,9 +101,9 @@ epsilon_surface          = 0
 
 ; OPTIONS FOR WEAK COUPLING ALGORITHMS
 ; Temperature coupling  
-Tcoupl                   = berendsen
+Tcoupl                   = v-rescale
 nsttcouple               = -1
-nh-chain-length          = 1
+nh-chain-length          = 10
 print-nose-hoover-chain-variables = no
 ; Groups to couple separately
 tc-grps                  = system
@@ -127,7 +127,7 @@ gen_temp                 = _TEMP_
 gen_seed                 = -1
 
 ; OPTIONS FOR BONDS    
-constraints              = all-bonds
+constraints              = h-bonds
 ; Type of constraint algorithm
 constraint-algorithm     = Lincs
 ; Do not constrain the start configuration
