@@ -1,0 +1,87 @@
+ # Version information for this restart file 
+ # current date 2014-07-20 23:47:05.199
+ # current working dir /Users/carlo/Work/apk/cp2k
+ # Program compiled at                              Fri 18 Jul 2014 12:50:46 BST
+ # Program compiled on                                      achille.ch.cam.ac.uk
+ # Program compiled for                           Darwin-IntelMacintosh-gfortran
+ # Source code revision number                                         svn:13632
+ &GLOBAL
+   PREFERRED_FFT_LIBRARY  FFTW3
+   PRINT_LEVEL  LOW
+   PROJECT_NAME suram 
+   RUN_TYPE GEO_OPT 
+ &END GLOBAL
+ &MOTION
+   &GEO_OPT
+     OPTIMIZER  BFGS
+     MAX_ITER  300
+     STEP_START_VAL  0
+   &END GEO_OPT
+ &END MOTION
+ &FORCE_EVAL
+   METHOD  QS
+   &DFT
+     BASIS_SET_FILE_NAME EMSL_BASIS_SETS 
+     POTENTIAL_FILE_NAME POTENTIAL
+     WFN_RESTART_FILE_NAME suram-RESTART.wfn
+     CHARGE  0
+    &MGRID
+      CUTOFF 400
+      REL_CUTOFF 50 
+    &END MGRID
+     &SCF
+      SCF_GUESS ATOMIC
+      EPS_SCF 1.0E-6
+      MAX_SCF 100
+      &OT
+        PRECONDITIONER FULL_ALL
+        MINIMIZER DIIS
+      &END OT
+       &OUTER_SCF
+          EPS_SCF 1.0E-6
+          MAX_SCF 5
+       &END
+     &END SCF
+    &QS 
+      METHOD GAPW
+    &END QS 
+     &XC
+      &XC_FUNCTIONAL BLYP
+      &END XC_FUNCTIONAL
+     &END XC
+     &POISSON
+       PERIODIC  NONE
+       POISSON_SOLVER WAVELET
+     &END POISSON
+   &END DFT
+   &SUBSYS
+     &CELL
+       ABC [angstrom] 21 21 21
+       PERIODIC  NONE
+     &END CELL
+     &KIND H
+       BASIS_SET 6-31Gxx  
+       POTENTIAL ALL 
+     &END KIND
+     &KIND C
+       BASIS_SET 6-31Gxx  
+       POTENTIAL ALL 
+     &END KIND
+     &KIND N
+       BASIS_SET 6-31Gxx  
+       POTENTIAL ALL 
+     &END KIND
+     &KIND O
+       BASIS_SET 6-31Gxx  
+       POTENTIAL ALL 
+     &END KIND
+     &KIND S
+       BASIS_SET 6-31Gxx  
+       POTENTIAL ALL 
+     &END KIND
+     &TOPOLOGY
+       COORD_FILE_NAME part1_box.pdb 
+       COORD_FILE_FORMAT  PDB
+     &END TOPOLOGY
+   &END SUBSYS
+ &END FORCE_EVAL
