@@ -17,7 +17,7 @@ init_step                = 0
 simulation_part          = 1
 ; Multiple time-stepping
 mts                      = yes
-mts-level2-forces        = longrange-nonbonded nonbonded ; pair dihedral 
+mts-level2-forces        = longrange-nonbonded ; nonbonded pair dihedral 
 ; mode for center of mass motion removal
 comm-mode                = Linear
 ; number of steps for center of mass motion removal
