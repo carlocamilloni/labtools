@@ -114197,17 +114197,17 @@ C5	C4	C6	C5M
 	   HY1     HA3	   0.090   1
 	   HY2     HA3	   0.090   1
 	   HY3     HA3	   0.090   1
-	   CY	   C	   0.510   2
-	   OY	   O	   -0.510  2
+	   C 	   C	   0.510   2
+	   O 	   O	   -0.510  2
  [ bonds ]
-	   CY	   CAY
-	   CY	   +N
+	   C 	   CAY
+	   C 	   +N
 	   CAY	   HY1
 	   CAY	   HY2
 	   CAY	   HY3
-	   OY	   CY
+	   O 	   C 
  [ impropers ]
-	   CY	   CAY	   +N	   OY
+	   C 	   CAY	   +N	   O 
 
 [ NME ] ; terminal residue, provided by Mark Abraham
 		; renamed by Justin Lemkul to avoid clash with N-methylacetamide
@@ -114226,8 +114226,8 @@ C5	C4	C6	C5M
 	   CAT	   HT2
 	   CAT	   HT3
  [ impropers ]
-	   N	   -C	   CH3	   HN
-	   -C	   CH3	   N	   -O
+	   NT	   -C	   CAT	   HNT
+	   -C	   CAT	   NT	   -O
 
 [ HOH ]
  [ atoms ]
