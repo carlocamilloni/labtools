@@ -1,16 +1,23 @@
+;
+;	File 'mdout.mdp' was generated
+;	By user: carlo (501)
+;	On host: Carlos-MacBook-Pro-2.local
+;	At date: Tue Apr 28 22:27:57 2015
+;
+
 ; VARIOUS PREPROCESSING OPTIONS
 ; Preprocessor information: use cpp syntax.
 ; e.g.: -I/home/joe/doe -I/home/mary/roe
 include                  = 
 ; e.g.: -DPOSRES -DFLEXIBLE (note these variable names are case sensitive)
-define                   = 
+define                   = -DPOSRES
 
 ; RUN CONTROL PARAMETERS
 integrator               = md
 ; Start time and timestep in ps
 tinit                    = 0
-dt                       = 0.005
-nsteps                   = -1 
+dt                       = 0.002
+nsteps                   = 250000
 ; For exact run continuation or redoing part of a run
 init_step                = 0
 ; Part index is updated automatically on checkpointing (keeps files separate)
@@ -18,7 +25,7 @@ simulation_part          = 1
 ; mode for center of mass motion removal
 comm-mode                = Linear
 ; number of steps for center of mass motion removal
-nstcomm                  = 50
+nstcomm                  = 100
 ; group(s) for center of mass motion removal
 comm-grps                = 
 
@@ -45,7 +52,7 @@ energygrps               =
 ; cut-off scheme (Verlet: particle based cut-offs, group: using charge groups)
 cutoff-scheme            = Verlet
 ; nblist update frequency
-nstlist                  = 10
+nstlist                  = 20
 ; ns algorithm (simple or grid)
 ns_type                  = grid
 ; Periodic boundary conditions: xyz, no, xy
@@ -73,7 +80,7 @@ vdw-modifier             = Potential-shift
 rvdw-switch              = 0
 rvdw                     = 1.0
 ; Apply long range dispersion corrections for Energy and Pressure
-DispCorr                 = no 
+DispCorr                 = no
 ; Extension of the potential lookup tables beyond the cut-off
 table-extension          = 1
 ; Separate tables between energy group pairs
@@ -104,19 +111,19 @@ tc-grps                  = system
 tau_t                    = 0.2
 ref_t                    = _TEMP_ 
 ; pressure coupling     
-Pcoupl                   = c-rescale 
+Pcoupl                   = No
 Pcoupltype               = isotropic
 nstpcouple               = -1
 ; Time constant (ps), compressibility (1/bar) and reference P (bar)
-tau_p                    = 1.0
+tau_p                    = 0.5
 compressibility          = 4.5e-5
 ref_p                    = 1.0
 ; Scaling of reference coordinates, No, All or COM
 refcoord_scaling         = No
 
 ; GENERATE VELOCITIES FOR STARTUP RUN
-gen_vel                  = no
-gen_temp                 = 
+gen_vel                  = yes
+gen_temp                 = _TEMP_ 
 gen_seed                 = -1
 
 ; OPTIONS FOR BONDS    
