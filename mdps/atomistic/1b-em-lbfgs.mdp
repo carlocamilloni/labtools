@@ -13,7 +13,7 @@ include                  =
 define                   = -DFLEXIBLE
 
 ; RUN CONTROL PARAMETERS
-integrator               = cg
+integrator               = l-bfgs 
 ; Start time and timestep in ps
 tinit                    = 0
 dt                       = 0.002
@@ -31,7 +31,7 @@ comm-grps                =
 
 ; ENERGY MINIMIZATION OPTIONS
 ; Force tolerance and initial step-size
-emtol                    = 100
+emtol                    = 10
 emstep                   = 0.01
 ; Max number of iterations in relax-shells
 niter                    = 20
