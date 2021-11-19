@@ -23,7 +23,7 @@ init_step                = 0
 ; Part index is updated automatically on checkpointing (keeps files separate)
 simulation_part          = 1
 ; mode for center of mass motion removal
-comm-mode                = Linear
+comm-mode                = none 
 ; number of steps for center of mass motion removal
 nstcomm                  = 100
 ; group(s) for center of mass motion removal
@@ -111,7 +111,7 @@ tc-grps                  = system
 tau_t                    = 0.2
 ref_t                    = _TEMP_ 
 ; pressure coupling     
-Pcoupl                   = No
+Pcoupl                   = c-rescale
 Pcoupltype               = isotropic
 nstpcouple               = -1
 ; Time constant (ps), compressibility (1/bar) and reference P (bar)
@@ -119,7 +119,7 @@ tau_p                    = 0.5
 compressibility          = 4.5e-5
 ref_p                    = 1.0
 ; Scaling of reference coordinates, No, All or COM
-refcoord_scaling         = No
+refcoord_scaling         = All
 
 ; GENERATE VELOCITIES FOR STARTUP RUN
 gen_vel                  = yes
@@ -128,7 +128,6 @@ gen_seed                 = -1
 
 ; OPTIONS FOR BONDS    
 constraints              = all-bonds
-;constraints              = h-bonds
 ; Type of constraint algorithm
 constraint-algorithm     = Lincs
 ; Do not constrain the start configuration

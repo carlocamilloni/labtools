@@ -36,7 +36,7 @@ nstvout                  = 50000
 nstfout                  = 0
 ; Output frequency for energies to log file and energy file
 nstlog                   = 50000
-nstcalcenergy            = 100
+nstcalcenergy            = -1
 nstenergy                = 5000
 ; Output frequency and precision for .xtc file
 nstxout-compressed       = 5000
@@ -111,7 +111,7 @@ tc-grps                  = system
 tau_t                    = 0.2
 ref_t                    = _TEMP_ 
 ; pressure coupling     
-Pcoupl                   = c-rescale 
+Pcoupl                   = c-rescale
 Pcoupltype               = isotropic
 nstpcouple               = -1
 ; Time constant (ps), compressibility (1/bar) and reference P (bar)

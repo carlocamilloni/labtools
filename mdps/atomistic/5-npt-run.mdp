@@ -29,7 +29,7 @@ nstvout                  = 50000
 nstfout                  = 0
 ; Output frequency for energies to log file and energy file
 nstlog                   = 50000
-nstcalcenergy            = 100
+nstcalcenergy            = -1
 nstenergy                = 5000
 ; Output frequency and precision for .xtc file
 nstxout-compressed       = 5000
@@ -120,7 +120,6 @@ gen_temp                 =
 gen_seed                 = -1
 
 ; OPTIONS FOR BONDS    
-;constraints              = all-bonds
 constraints              = h-bonds
 ; Type of constraint algorithm
 constraint-algorithm     = Lincs

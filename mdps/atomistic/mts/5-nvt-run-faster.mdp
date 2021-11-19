@@ -9,16 +9,19 @@ define                   =
 integrator               = md
 ; Start time and timestep in ps
 tinit                    = 0
-dt                       = 0.005
+dt                       = 0.0018
 nsteps                   = -1 
 ; For exact run continuation or redoing part of a run
 init_step                = 0
 ; Part index is updated automatically on checkpointing (keeps files separate)
 simulation_part          = 1
+; Multiple time-stepping
+mts                      = yes
+mts-level2-forces        = longrange-nonbonded nonbonded ; pair dihedral 
 ; mode for center of mass motion removal
 comm-mode                = Linear
 ; number of steps for center of mass motion removal
-nstcomm                  = 50
+nstcomm                  = 100
 ; group(s) for center of mass motion removal
 comm-grps                = 
 
@@ -42,12 +45,10 @@ compressed-x-grps        = protein
 energygrps               = 
 
 ; NEIGHBORSEARCHING PARAMETERS
-; cut-off scheme (Verlet: particle based cut-offs, group: using charge groups)
+; cut-off scheme (Verlet: particle based cut-offs)
 cutoff-scheme            = Verlet
 ; nblist update frequency
-nstlist                  = 10
-; ns algorithm (simple or grid)
-ns_type                  = grid
+nstlist                  = 20
 ; Periodic boundary conditions: xyz, no, xy
 pbc                      = xyz
 periodic_molecules       = no
@@ -104,7 +105,7 @@ tc-grps                  = system
 tau_t                    = 0.2
 ref_t                    = _TEMP_ 
 ; pressure coupling     
-Pcoupl                   = c-rescale 
+Pcoupl                   = no
 Pcoupltype               = isotropic
 nstpcouple               = -1
 ; Time constant (ps), compressibility (1/bar) and reference P (bar)
@@ -120,8 +121,7 @@ gen_temp                 =
 gen_seed                 = -1
 
 ; OPTIONS FOR BONDS    
-constraints              = all-bonds
-;constraints              = h-bonds
+constraints              = h-bonds
 ; Type of constraint algorithm
 constraint-algorithm     = Lincs
 ; Do not constrain the start configuration

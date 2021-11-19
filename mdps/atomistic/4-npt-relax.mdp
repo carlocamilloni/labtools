@@ -10,7 +10,7 @@ integrator               = md
 ; Start time and timestep in ps
 tinit                    = 0
 dt                       = 0.002
-nsteps                   = 250000 
+nsteps                   = 250000
 ; For exact run continuation or redoing part of a run
 init_step                = 0
 ; Part index is updated automatically on checkpointing (keeps files separate)
@@ -29,7 +29,7 @@ nstvout                  = 50000
 nstfout                  = 0
 ; Output frequency for energies to log file and energy file
 nstlog                   = 50000
-nstcalcenergy            = 100
+nstcalcenergy            = -1
 nstenergy                = 5000
 ; Output frequency and precision for .xtc file
 nstxout-compressed       = 5000
@@ -73,7 +73,7 @@ vdw-modifier             = Potential-shift
 rvdw-switch              = 0
 rvdw                     = 1.0
 ; Apply long range dispersion corrections for Energy and Pressure
-DispCorr                 = no 
+DispCorr                 = no
 ; Extension of the potential lookup tables beyond the cut-off
 table-extension          = 1
 ; Separate tables between energy group pairs
