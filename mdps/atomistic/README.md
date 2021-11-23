@@ -5,4 +5,6 @@ charmm/amber force-fields
 2) position restraint should be run for longer in case of membrane proteins
 
 mts: files to be used with multiple-time step algorithm 
+
 hmr: files to be used for hydrogen mass repartitoning 
+
