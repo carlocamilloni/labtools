@@ -115,9 +115,11 @@ static void calc_mat(int        nres,
                      int        resind[],
                      real       trunc,
                      real       cdist,
+                     int        ex_res,
                      real**     mdmat,
                      int**      nmat,
                      double**   tmat,
+                     double**   dmat,
                      double     ww,
                      PbcType    pbcType,
                      matrix     box)
@@ -150,7 +152,7 @@ static void calc_mat(int        nres,
                 nmat[resi][j]++;
                 nmat[resj][i]++;
             }
-            if((r2 < cdist2)&&(abs(resind[resi]-resind[resj])>1)) { tmat[i][j]+=ww; tmat[j][i]+=ww; }
+            if((r2 < cdist2)&&(abs(resind[resi]-resind[resj])>ex_res)) { tmat[i][j]+=ww; tmat[j][i]+=ww; dmat[i][j]+=std::sqrt(r2); dmat[j][i]+=std::sqrt(r2);}
             mdmat[resi][resj] = std::min(r2, mdmat[resi][resj]);
         }
     }
@@ -200,11 +202,13 @@ int gmx_mdmat(int argc, char* argv[])
     };
     static real truncate = 1.5;
     static real cdist=0.5;
+    static int  ex_res=-1;
     static real frac=0.9;
     static int  nlevels  = 40;
     t_pargs     pa[]     = {
         { "-t", FALSE, etREAL, { &truncate }, "trunc distance" },
         { "-cdist",   FALSE, etREAL, {&cdist}, "contact distance" },
+        { "-excl",    FALSE, etINT, {&ex_res}, "excluded residues" },
         { "-natfrac",   FALSE, etREAL, {&frac}, "contact populations to be considered native" },
         { "-nlevels", FALSE, etINT, { &nlevels }, "Discretize distance in this number of levels" }
     };
@@ -234,7 +238,7 @@ int gmx_mdmat(int argc, char* argv[])
     rvec*             x;
     real **           mdmat, *resnr, **totmdmat, **cmap;
     int **            nmat, **totnmat;
-    double **         tmat;
+    double            **tmat, **dmat;
     real*             mean_n;
     int*              tot_n;
     matrix            box = { { 0 } };
@@ -319,8 +323,12 @@ int gmx_mdmat(int argc, char* argv[])
         snew(totmdmat[i], nres);
     }
     snew(tmat,natoms);
-    for(i=0; (i<natoms); i++) snew(tmat[i],natoms); 
-
+    snew(dmat,natoms);
+    for(i=0; (i<natoms); i++) 
+    {
+       snew(tmat[i],natoms); 
+       snew(dmat[i],natoms); 
+    }
     trxnat = read_first_x(oenv, &status, ftp2fn(efTRX, NFILE, fnm), &t, &x, box);
 
     nframes = 0;
@@ -349,7 +357,7 @@ int gmx_mdmat(int argc, char* argv[])
         if(use_weights) fscanf(fp,"%lf",&ww);
         else ww=1.;
         nframes+=ww;
-        calc_mat(nres, natoms, rndx, x, index, resind, truncate, cdist, mdmat, nmat, tmat, ww, pbcType, box);
+        calc_mat(nres, natoms, rndx, x, index, resind, truncate, cdist, ex_res, mdmat, nmat, tmat, dmat, ww, pbcType, box);
         for (i = 0; (i < nres); i++)
         {
             for (j = 0; (j < natoms); j++)
@@ -408,8 +416,8 @@ int gmx_mdmat(int argc, char* argv[])
 
   for(i=0;i<natoms;i++) for(j=0;j<natoms;j++) 
     {
-      if((tmat[i][j] > frac*nframes ) && (abs(resind[rndx[i]]-resind[rndx[j]])>1) )        
-        fprintf(media,"%3i %3i %3i %3i\n", resind[rndx[i]], index[i], resind[rndx[j]], index[j]); 
+      if((tmat[i][j] > frac*nframes ) && (abs(resind[rndx[i]]-resind[rndx[j]])>ex_res) )        
+        fprintf(media,"%3i %3i %3i %3i %lf %lf\n", resind[rndx[i]], index[i], resind[rndx[j]], index[j], dmat[i][j]/tmat[i][j], tmat[i][j]/nframes); 
     }
   fclose(media);
     write_xpm(opt2FILE("-mean", NFILE, fnm, "w"), 0, "Mean smallest distance", "Distance (nm)",
