@@ -201,14 +201,14 @@ int gmx_mdmat(int argc, char* argv[])
         "The output can be processed with [gmx-xpm2ps] to make a PostScript (tm) plot."
     };
     static real truncate = 1.5;
-    static real cdist=0.5;
+    static real cdist=0.55;
     static int  ex_res=-1;
-    static real frac=0.9;
+    static real frac=-1;
     static int  nlevels  = 40;
     t_pargs     pa[]     = {
         { "-t", FALSE, etREAL, { &truncate }, "trunc distance" },
         { "-cdist",   FALSE, etREAL, {&cdist}, "contact distance" },
-        { "-excl",    FALSE, etINT, {&ex_res}, "excluded residues" },
+        { "-excl",    FALSE, etINT, {&ex_res}, "excluded neighbor residues" },
         { "-natfrac",   FALSE, etREAL, {&frac}, "contact populations to be considered native" },
         { "-nlevels", FALSE, etINT, { &nlevels }, "Discretize distance in this number of levels" }
     };
