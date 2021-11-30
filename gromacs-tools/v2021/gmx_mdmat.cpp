@@ -414,6 +414,7 @@ int gmx_mdmat(int argc, char* argv[])
 
   for(i=0;i<natoms;i++) for(j=0;j<natoms;j++) 
     {
+      if(i==j) {dmat[i][j]=0.; tmat[i][j]=nframes;}
       if((tmat[i][j] > frac*nframes ) && (abs(rndx[i]-rndx[j])>ex_res) )        
         fprintf(media,"%3i %3i %3i %3i %lf %lf\n", useatoms.atom[i].resind+1, index[i]+1, useatoms.atom[j].resind+1, index[j]+1, ((tmat[i][j] > 0) ? dmat[i][j]/tmat[i][j] : 0), tmat[i][j]/nframes); 
     }
