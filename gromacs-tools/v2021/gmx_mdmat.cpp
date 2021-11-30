@@ -112,7 +112,6 @@ static void calc_mat(int        nres,
                      const int  rndx[],
                      rvec       x[],
                      const int* index,
-                     int        resind[],
                      real       trunc,
                      real       cdist,
                      int        ex_res,
@@ -152,7 +151,7 @@ static void calc_mat(int        nres,
                 nmat[resi][j]++;
                 nmat[resj][i]++;
             }
-            if((r2 < cdist2)&&(abs(resind[resi]-resind[resj])>ex_res)) { tmat[i][j]+=ww; tmat[j][i]+=ww; dmat[i][j]+=std::sqrt(r2); dmat[j][i]+=std::sqrt(r2);}
+            if((r2 < cdist2)&&(abs(resi-resj)>ex_res)) { tmat[i][j]+=ww; tmat[j][i]+=ww; dmat[i][j]+=std::sqrt(r2); dmat[j][i]+=std::sqrt(r2);}
             mdmat[resi][resj] = std::min(r2, mdmat[resi][resj]);
         }
     }
@@ -227,7 +226,7 @@ int gmx_mdmat(int argc, char* argv[])
     int        isize;
     int*       index;
     char*      grpname;
-    int *      resind, *rndx, *natm, prevres, newres;
+    int        *rndx, *natm, prevres, newres;
 
     int               i, j, nres, natoms, trxnat;
     t_trxstatus*      status;
@@ -272,7 +271,6 @@ int gmx_mdmat(int argc, char* argv[])
 
     useatoms.nres = 0;
     snew(useatoms.resinfo, natoms);
-    snew(resind,top.atoms.nres);
 
     prevres = top.atoms.atom[index[0]].resind;
     newres  = 0;
@@ -357,7 +355,7 @@ int gmx_mdmat(int argc, char* argv[])
         if(use_weights) fscanf(fp,"%lf",&ww);
         else ww=1.;
         nframes+=ww;
-        calc_mat(nres, natoms, rndx, x, index, resind, truncate, cdist, ex_res, mdmat, nmat, tmat, dmat, ww, pbcType, box);
+        calc_mat(nres, natoms, rndx, x, index, truncate, cdist, ex_res, mdmat, nmat, tmat, dmat, ww, pbcType, box);
         for (i = 0; (i < nres); i++)
         {
             for (j = 0; (j < natoms); j++)
@@ -416,8 +414,8 @@ int gmx_mdmat(int argc, char* argv[])
 
   for(i=0;i<natoms;i++) for(j=0;j<natoms;j++) 
     {
-      if((tmat[i][j] > frac*nframes ) && (abs(resind[rndx[i]]-resind[rndx[j]])>ex_res) )        
-        fprintf(media,"%3i %3i %3i %3i %lf %lf\n", resind[rndx[i]], index[i], resind[rndx[j]], index[j], dmat[i][j]/tmat[i][j], tmat[i][j]/nframes); 
+      if((tmat[i][j] > frac*nframes ) && (abs(rndx[i]-rndx[j])>ex_res) )        
+        fprintf(media,"%3i %3i %3i %3i %lf %lf\n", useatoms.atom[i].resind+1, index[i]+1, useatoms.atom[j].resind+1, index[j]+1, ((tmat[i][j] > 0) ? dmat[i][j]/tmat[i][j] : 0), tmat[i][j]/nframes); 
     }
   fclose(media);
     write_xpm(opt2FILE("-mean", NFILE, fnm, "w"), 0, "Mean smallest distance", "Distance (nm)",
