@@ -1,7 +1,7 @@
 # this is optional and tell to VIM that this is a PLUMED file
 # vim: ft=plumed
 # see comments just below this input file
-MOLINFO MOLTYPE=protein STRUCTURE=template.pdb
+MOLINFO MOLTYPE=protein STRUCTURE=../template.pdb
 WHOLEMOLECULES ENTITY0=1-111
 
 # CVs, Psi9, Phi1 are not defined
@@ -23,31 +23,22 @@ phi7: TORSION ATOMS=@phi-7 NOPBC
 phi8: TORSION ATOMS=@phi-8 NOPBC
 phi9: TORSION ATOMS=@phi-9 NOPBC
 
-# Bulky Trp residue dihedral
-dihtrp_cacb: TORSION ATOMS=67,47,49,52
-dihtrp_cbcg: TORSION ATOMS=47,49,52,53
-
-gyr: GYRATION TYPE=RADIUS ATOMS=@CA-1,@CA-2,@CA-3,@CA-4,@CA-5,@CA-6,@CA-7,@CA-8,@CA-9 NOPBC
-
 # PBMetaD
 PBMETAD ...
     LABEL=pb
-    ARG=phi2,phi3,phi4,phi5,phi6,phi7,phi8,phi9,psi1,psi2,psi3,psi4,psi5,psi6,psi7,psi8,dihtrp_cacb,dihtrp_cbcg
-    SIGMA=1000 
-    SIGMA_MIN=0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06,0.06
-    SIGMA_MAX=0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6
-    ADAPTIVE=DIFF
+    ARG=phi2,phi3,phi4,phi5,phi6,phi7,phi8,phi9,psi1,psi2,psi3,psi4,psi5,psi6,psi7,psi8
+    SIGMA=0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1
     HEIGHT=0.5
     PACE=200
-    BIASFACTOR=34
-    GRID_MIN=-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi
-    GRID_MAX=pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi
+    BIASFACTOR=10
+    GRID_MIN=-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi,-pi
+    GRID_MAX=pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi,pi
     GRID_WSTRIDE=50000
     WALKERS_MPI
 ... PBMETAD
 
 # output from the collective variable
-PRINT FILE=COLVAR ARG=gyr,phi2,phi3,phi4,phi5,phi6,phi7,phi8,phi9,psi1,psi2,psi3,psi4,psi5,psi6,psi7,psi8,dihtrp_cacb,dihtrp_cbcg STRIDE=2000
+PRINT FILE=COLVAR ARG=phi2,phi3,phi4,phi5,phi6,phi7,phi8,phi9,psi1,psi2,psi3,psi4,psi5,psi6,psi7,psi8 STRIDE=10000
 
 # EXPERIMENTAL DATA SECTION
 
@@ -68,7 +59,7 @@ RDC ...
     LABEL=nh
     DOSCORE
     ARG=pb.bias
-    NOISETYPE=MGAUSS REWEIGHT OPTSIGMAMEAN=SEM AVERAGING=200
+    NOISETYPE=MGAUSS REWEIGHT OPTSIGMAMEAN=SEM_MAX AVERAGING=200
     REGRES_ZERO=200
     SIGMA0=1.0 SIGMA_MIN=0.0001 SIGMA_MAX=5.0 DSIGMA=0.1
     WRITE_STRIDE=10000
@@ -91,7 +82,7 @@ RDC ...
     LABEL=caha
     DOSCORE
     ARG=pb.bias
-    NOISETYPE=MGAUSS  REWEIGHT  OPTSIGMAMEAN=SEM AVERAGING=200
+    NOISETYPE=MGAUSS  REWEIGHT  OPTSIGMAMEAN=SEM_MAX AVERAGING=200
     REGRES_ZERO=200
     SIGMA0=1.0 SIGMA_MIN=0.0001 SIGMA_MAX=5.0 DSIGMA=0.1
     WRITE_STRIDE=10000
@@ -102,7 +93,6 @@ mcaha: BIASVALUE ARG=caha.score
 # xGxAWxASx
 JCOUPLING ...
     NOPBC
-    ADDCOUPLINGS
     TYPE=HAN
     ATOMS1=@psi-2 COUPLING1=-0.49
     ATOMS2=@psi-4 COUPLING2=-0.54
@@ -115,7 +105,6 @@ JCOUPLING ...
 # xxAAWAASS
 JCOUPLING ...
     NOPBC
-    ADDCOUPLINGS
     TYPE=HAHN
     ATOMS1=@phi-2 COUPLING1=6.05
     ATOMS2=@phi-3 COUPLING2=5.95
@@ -130,7 +119,6 @@ JCOUPLING ...
 # xxxxWxxxx
 JCOUPLING ...
     NOPBC
-    ADDCOUPLINGS
     TYPE=CCG
     ATOMS1=@chi1-5 COUPLING1=1.59
     LABEL=jccg
@@ -139,50 +127,30 @@ JCOUPLING ...
 # xxxxWxxxx
 JCOUPLING ...
     NOPBC
-    ADDCOUPLINGS
     TYPE=NCG
     ATOMS1=@chi1-5 COUPLING1=1.21
     LABEL=jncg
 ... JCOUPLING
 
 METAINFERENCE ...
-    ARG=(jhan\.j_.*),(jhahn\.j_.*),(jccg\.j.*),(jncg\.j.*),pb.bias
-    PARARG=(jhan\.exp_.*),(jhahn\.exp_.*),(jccg\.exp.*),(jncg\.exp.*)
-    NOISETYPE=MGAUSS REWEIGHT OPTSIGMAMEAN=SEM AVERAGING=200
+    ARG=(jhan\.j-.*),(jhahn\.j-.*),(jccg\.j.*),(jncg\.j.*),pb.bias
+    PARARG=(jhan\.exp-.*),(jhahn\.exp-.*),(jccg\.exp.*),(jncg\.exp.*)
+    NOISETYPE=MGAUSS REWEIGHT OPTSIGMAMEAN=SEM_MAX AVERAGING=200
     SIGMA0=2.5 SIGMA_MIN=0.0001 SIGMA_MAX=5.0 DSIGMA=0.1
     WRITE_STRIDE=10000
     LABEL=byj
 ... METAINFERENCE
 #
 # Chemical shifts
-cs: CS2BACKBONE NOPBC ATOMS=1-111 DATADIR=data TEMPLATE=template.pdb DOSCORE ARG=pb.bias NOISETYPE=MOUTLIERS REWEIGHT OPTSIGMAMEAN=SEM AVERAGING=200 SIGMA0=4.0 SIGMA_MIN=0.0001 SIGMA_MAX=5.0 DSIGMA=0.1 WRITE_STRIDE=10000
+cs: CS2BACKBONE NOPBC ATOMS=1-111 DATADIR=../data TEMPLATE=template.pdb DOSCORE ARG=pb.bias NOISETYPE=MGAUSS REWEIGHT OPTSIGMAMEAN=SEM_MAX AVERAGING=200 SIGMA0=4.0 SIGMA_MIN=0.0001 SIGMA_MAX=5.0 DSIGMA=0.1 WRITE_STRIDE=10000
 mcs: BIASVALUE ARG=cs.score
 
 # output from METAINFERENCE
 FLUSH STRIDE=10000
-PRINT ARG=nh.score,nh.acceptSigma,nh.weight,nh.scale,(nh\.sigma.*)   STRIDE=2000 FILE=BAYES.RDC.NH
+PRINT ARG=nh.score,nh.acceptSigma,nh.weight,nh.scale,(nh\.sigma.*) STRIDE=2000 FILE=BAYES.RDC.NH
 PRINT ARG=caha.score,caha.acceptSigma,caha.weight,caha.scale,(caha\.sigma.*) STRIDE=2000 FILE=BAYES.RDC.CAHA
 PRINT ARG=byj.*  STRIDE=2000 FILE=BAYES.J
 PRINT ARG=cs.score,cs.acceptSigma,cs.weight,(cs\.sigma.*)   STRIDE=2000 FILE=BAYES.CS
-
-# Calculate weighted ensemble average
-ENSEMBLE ...
-    ARG=(nh\.rdc_.*),(caha\.rdc_.*),pb.bias REWEIGHT
-    LABEL=ens
-... ENSEMBLE
-
-# We use the analogous function for all other observables
-STATS ...
-    ARG=(ens\.nh\.rdc_.*) PARARG=(nh\.exp_.*)
-    LABEL=nhst
-... STATS
-
-STATS ...
-    ARG=(ens\.caha\.rdc_.*) PARARG=(caha\.exp_.*)
-    LABEL=cahast
-... STATS
-
-PRINT ARG=nhst.*,cahast.* FILE=STATS STRIDE=2000
 
 ENDPLUMED
 
