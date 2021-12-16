@@ -119,6 +119,8 @@ static void calc_mat(int        nres,
                      int**      nmat,
                      double**   tmat,
                      double**   dmat,
+                     double**   d12mat,
+                     real       d_pow,
                      double     ww,
                      PbcType    pbcType,
                      matrix     box)
@@ -151,7 +153,11 @@ static void calc_mat(int        nres,
                 nmat[resi][j]++;
                 nmat[resj][i]++;
             }
-            if((r2 < cdist2)&&(abs(resi-resj)>ex_res)) { tmat[i][j]+=ww; tmat[j][i]+=ww; dmat[i][j]+=std::sqrt(r2); dmat[j][i]+=std::sqrt(r2);}
+            if((r2 < cdist2)&&(abs(resi-resj)>ex_res)) { 
+                tmat[i][j]+=ww; tmat[j][i]+=ww; 
+                dmat[i][j]+=std::sqrt(r2); dmat[j][i]+=std::sqrt(r2); 
+                d12mat[i][j]+=std::pow(1./r2,d_pow/2); d12mat[j][i]+=std::pow(1./r2,d_pow/2);
+            }
             mdmat[resi][resj] = std::min(r2, mdmat[resi][resj]);
         }
     }
@@ -202,12 +208,14 @@ int gmx_mdmat(int argc, char* argv[])
     static real truncate = 1.5;
     static real cdist=0.55;
     static int  ex_res=-1;
+    static real  d_pow=12;
     static real frac=-1;
     static int  nlevels  = 40;
     t_pargs     pa[]     = {
         { "-t", FALSE, etREAL, { &truncate }, "trunc distance" },
         { "-cdist",   FALSE, etREAL, {&cdist}, "contact distance" },
         { "-excl",    FALSE, etINT, {&ex_res}, "excluded neighbor residues" },
+        { "-power",    FALSE, etREAL, {&d_pow}, "expontent for nmr-like averaging" },
         { "-natfrac",   FALSE, etREAL, {&frac}, "contact populations to be considered native" },
         { "-nlevels", FALSE, etINT, { &nlevels }, "Discretize distance in this number of levels" }
     };
@@ -237,7 +245,7 @@ int gmx_mdmat(int argc, char* argv[])
     rvec*             x;
     real **           mdmat, *resnr, **totmdmat, **cmap;
     int **            nmat, **totnmat;
-    double            **tmat, **dmat;
+    double            **tmat, **dmat, **d12mat;
     real*             mean_n;
     int*              tot_n;
     matrix            box = { { 0 } };
@@ -322,10 +330,12 @@ int gmx_mdmat(int argc, char* argv[])
     }
     snew(tmat,natoms);
     snew(dmat,natoms);
+    snew(d12mat,natoms);
     for(i=0; (i<natoms); i++) 
     {
        snew(tmat[i],natoms); 
        snew(dmat[i],natoms); 
+       snew(d12mat[i],natoms); 
     }
     trxnat = read_first_x(oenv, &status, ftp2fn(efTRX, NFILE, fnm), &t, &x, box);
 
@@ -355,7 +365,7 @@ int gmx_mdmat(int argc, char* argv[])
         if(use_weights) fscanf(fp,"%lf",&ww);
         else ww=1.;
         nframes+=ww;
-        calc_mat(nres, natoms, rndx, x, index, truncate, cdist, ex_res, mdmat, nmat, tmat, dmat, ww, pbcType, box);
+        calc_mat(nres, natoms, rndx, x, index, truncate, cdist, ex_res, mdmat, nmat, tmat, dmat, d12mat, d_pow, ww, pbcType, box);
         for (i = 0; (i < nres); i++)
         {
             for (j = 0; (j < natoms); j++)
@@ -414,9 +424,10 @@ int gmx_mdmat(int argc, char* argv[])
 
   for(i=0;i<natoms;i++) for(j=0;j<natoms;j++) 
     {
-      if(i==j) {dmat[i][j]=0.; tmat[i][j]=nframes;}
+      if(i==j) {dmat[i][j]=0.; d12mat[i][j]=0.; tmat[i][j]=nframes;}
       if((tmat[i][j] > frac*nframes ) && (abs(rndx[i]-rndx[j])>ex_res) )        
-        fprintf(media,"%3i %3i %3i %3i %lf %lf\n", useatoms.atom[i].resind+1, index[i]+1, useatoms.atom[j].resind+1, index[j]+1, ((tmat[i][j] > 0) ? dmat[i][j]/tmat[i][j] : 0), tmat[i][j]/nframes); 
+        fprintf(media,"%3i %3i %3i %3i %lf %lf %lf\n", useatoms.atom[i].resind+1, index[i]+1, useatoms.atom[j].resind+1, index[j]+1, ((tmat[i][j] > 0) ? dmat[i][j]/tmat[i][j] : 0), 
+                                                       ((tmat[i][j] > 0) ? ((d12mat[i][j]>0) ? std::pow(d12mat[i][j]/tmat[i][j], -1./d_pow) : 0) : 0), tmat[i][j]/nframes); 
     }
   fclose(media);
     write_xpm(opt2FILE("-mean", NFILE, fnm, "w"), 0, "Mean smallest distance", "Distance (nm)",
