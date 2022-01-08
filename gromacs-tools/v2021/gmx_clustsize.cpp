@@ -74,6 +74,7 @@ static void clust_size(const char*             ndx,
                        const char*             mcl,
                        const char*             histo,
                        const char*             histotime,
+                       const char*             clustime,
                        const char*             tempf,
                        const char*             mcn,
                        gmx_bool                bMol,
@@ -87,9 +88,9 @@ static void clust_size(const char*             ndx,
                        int                     ndf,
                        const gmx_output_env_t* oenv)
 {
-    FILE *       fp, *gp, *hp, *tp;
+    FILE *       fp, *gp, *hp, *tp, *cndx;
     int*         index = nullptr;
-    int          nindex, natoms;
+    int          nindex, natoms; // number of atoms/molecules, number of atoms
     t_trxstatus* status;
     rvec *       x = nullptr, *v = nullptr, dx;
     t_pbc        pbc;
@@ -173,7 +174,9 @@ static void clust_size(const char*             ndx,
     snew(clust_index, nindex);
     snew(clust_size, nindex);
     cut2   = cut * cut;
+    // total number of trajectory frames
     nframe = 0;
+    // number of analysed frames
     n_x    = 0;
     snew(t_y, nindex);
     for (i = 0; (i < nindex); i++)
@@ -183,6 +186,7 @@ static void clust_size(const char*             ndx,
     max_clust_size = 1;
     max_clust_ind  = -1;
     int molb       = 0;
+    cndx = fopen(clustime, "w");
     do
     {
         if ((nskip == 0) || ((nskip > 0) && ((nframe % nskip) == 0)))
@@ -203,13 +207,13 @@ static void clust_size(const char*             ndx,
                 clust_size[i] = 1;
             }
 
-            /* Loop over atoms */
+            /* Loop over atoms/molecules */
             for (i = 0; (i < nindex); i++)
             {
                 ai = index[i];
                 ci = clust_index[i];
 
-                /* Loop over atoms (only half a matrix) */
+                /* Loop over atoms/molecules (only half a matrix) */
                 for (j = i + 1; (j < nindex); j++)
                 {
                     cj = clust_index[j];
@@ -358,6 +362,11 @@ static void clust_size(const char*             ndx,
                 }
             }
         }
+        // For each molecule we could write to which cluster it belongs, this may be used to write a chain ID to identify each cluster at a given time
+        // but how do you do transition?
+        fprintf(cndx, "%10.3f ", frameTime);
+        for (i = 0; (i < nindex); i++) fprintf(cndx, "%i ", clust_index[i]);
+        fprintf(cndx, "\n");
         nframe++;
     } while (read_next_frame(oenv, status, &fr));
     close_trx(status);
@@ -366,6 +375,7 @@ static void clust_size(const char*             ndx,
     xvgrclose(gp);
     xvgrclose(hp);
     xvgrclose(tp);
+    fclose(cndx); 
 
     snew(clust_written, nindex);
     if (max_clust_ind >= 0)
@@ -582,6 +592,7 @@ int gmx_clustsize(int argc, char* argv[])
         { efXVG, "-mc", "maxclust", ffWRITE },    { efXVG, "-ac", "avclust", ffWRITE },
         { efXVG, "-hc", "histo-clust", ffWRITE }, { efXVG, "-temp", "temp", ffOPTWR },
         { efDAT, "-hct", "histo-time", ffWRITE },
+        { efDAT, "-ict", "clust-index-time", ffWRITE },
         { efNDX, "-mcn", "maxclust", ffOPTWR }
     };
 #define NFILE asize(fnm)
@@ -608,7 +619,7 @@ int gmx_clustsize(int argc, char* argv[])
 
     clust_size(fnNDX, ftp2fn(efTRX, NFILE, fnm), opt2fn("-o", NFILE, fnm), opt2fn("-ow", NFILE, fnm),
                opt2fn("-nc", NFILE, fnm), opt2fn("-ac", NFILE, fnm), opt2fn("-mc", NFILE, fnm),
-               opt2fn("-hc", NFILE, fnm), opt2fn("-hct", NFILE, fnm), opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm),
+               opt2fn("-hc", NFILE, fnm), opt2fn("-hct", NFILE, fnm), opt2fn("-ict", NFILE, fnm), opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm),
                bMol, bPBC, fnTPR, cutoff, nskip, nlevels, rgblo, rgbhi, ndf, oenv);
 
     output_env_done(oenv);
