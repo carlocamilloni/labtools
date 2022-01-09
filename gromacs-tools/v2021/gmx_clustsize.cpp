@@ -82,6 +82,7 @@ static void clust_size(const char*             ndx,
                        gmx_bool                bPBC,
                        const char*             tpr,
                        real                    cut,
+                       real                    mol_cut,
                        int                     nskip,
                        int                     nlevels,
                        t_rgb                   rmid,
@@ -191,7 +192,10 @@ static void clust_size(const char*             ndx,
     snew(clust_size, nindex);
     // cs_map is used as a contact map to allow to parallelise the following loop in the case of molecules
     snew(cs_map, nindex);
+    rvec *xcm;
+    snew(xcm, nindex);
     for(i=0;i<nindex;i++) snew(cs_map[i], nindex);
+    real mcut2 = mol_cut*mol_cut;
     cut2   = cut * cut;
     // total number of trajectory frames
     nframe = 0;
@@ -224,25 +228,50 @@ static void clust_size(const char*             ndx,
                 clust_index[i] = i;
                 /* Cluster size is indexed with cluster number */
                 clust_size[i] = 1;
+                clear_rvec(xcm[i]);
             }
-
+            /* calculate the center of each molecule */
+            for (i = 0; (i < nindex); i++)
+            {   
+                ai = index[i];
+                real tm = 0.;
+                for (ii = mols.block(ai).begin(); ii < mols.block(ai).end(); ii++)
+                {
+                    for (int m = 0; (m < DIM); m++)
+                    {
+                        xcm[i][m] += x[ii][m];
+                    }
+                    tm += 1.0; 
+                }
+                for (int m = 0; (m < DIM); m++)
+                {
+                    xcm[i][m] /= tm;
+                }
+            }
 
             /* Loop over atoms/molecules */
 #pragma omp parallel for 
             for (i = 0; (i < nindex); i++)
             {
                 ai = index[i];
-
-                /* Compute distance */
-                for (ii = mols.block(ai).begin(); ii < mols.block(ai).end(); ii++)
+                /* Loop over atoms/molecules (only half a matrix) */
+                for (j = i + 1; (j < nindex); j++)
                 {
-                    /* Loop over atoms/molecules (only half a matrix) */
-                    for (j = i + 1; (j < nindex); j++)
+                    if (bPBC)
                     {
-                        bSame = FALSE;
-                        if(cs_map[i][j]) continue;
-                        aj = index[j];
-
+                        pbc_dx(&pbc, xcm[i], xcm[j], dx);
+                    }
+                    else
+                    {
+                        rvec_sub(xcm[i], xcm[j], dx);
+                    }
+                    dx2   = norm2(dx);
+                    if (dx2 > mcut2) continue;
+                    bSame = FALSE;
+                    aj = index[j];
+                    /* Compute distance */
+                    for (ii = mols.block(ai).begin(); ii < mols.block(ai).end(); ii++)
+                    {
                         for (jj = mols.block(aj).begin(); jj < mols.block(aj).end(); jj++)
                         {
                             if (bPBC)
@@ -257,15 +286,17 @@ static void clust_size(const char*             ndx,
                             bSame = (dx2 < cut2);
                             if(bSame) break;
                         }
-                        if (bSame)
-                        {
-                            cs_map[i][j] = 1;
-                        }
+                        if (bSame) break;
+                    }
+                    if (bSame)
+                    {
+                        cs_map[i][j] = 1;
                     }
                 }
             }
             /* This loop is the one to merge the clusters */
             /* Loop over atoms/molecules */
+#pragma omp barrier
             for (i = 0; (i < nindex); i++)
             {
                 ci = clust_index[i];
@@ -557,6 +588,7 @@ int gmx_clustsize(int argc, char* argv[])
     static int      nThreads = 0;
 
     real     cutoff  = 0.35;
+    real     mol_cutoff  = 2.00;
     int      nskip   = 0;
     int      nlevels = 20;
     int      ndf     = -1;
@@ -573,6 +605,11 @@ int gmx_clustsize(int argc, char* argv[])
           etREAL,
           { &cutoff },
           "Largest distance (nm) to be considered in a cluster" },
+        { "-mol_cut",
+          FALSE,
+          etREAL,
+          { &mol_cutoff },
+          "Largest distance (nm) to be considered between molecules in a cluster" },
         { "-mol",
           FALSE,
           etBOOL,
@@ -651,7 +688,7 @@ int gmx_clustsize(int argc, char* argv[])
     clust_size(fnNDX, ftp2fn(efTRX, NFILE, fnm), opt2fn("-o", NFILE, fnm), opt2fn("-ow", NFILE, fnm),
                opt2fn("-nc", NFILE, fnm), opt2fn("-ac", NFILE, fnm), opt2fn("-mc", NFILE, fnm),
                opt2fn("-hc", NFILE, fnm), opt2fn("-hct", NFILE, fnm), opt2fn("-ict", NFILE, fnm), opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm),
-               bMol, bPBC, fnTPR, cutoff, nskip, nlevels, rgblo, rgbhi, ndf, nThreads, oenv);
+               bMol, bPBC, fnTPR, cutoff, mol_cutoff, nskip, nlevels, rgblo, rgbhi, ndf, nThreads, oenv);
 
     output_env_done(oenv);
 
