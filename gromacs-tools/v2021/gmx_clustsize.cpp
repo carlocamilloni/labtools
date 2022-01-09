@@ -226,56 +226,41 @@ static void clust_size(const char*             ndx,
                 clust_size[i] = 1;
             }
 
+
             /* Loop over atoms/molecules */
 #pragma omp parallel for 
             for (i = 0; (i < nindex); i++)
             {
                 ai = index[i];
 
-                /* Loop over atoms/molecules (only half a matrix) */
-                for (j = i + 1; (j < nindex); j++)
+                /* Compute distance */
+                for (ii = mols.block(ai).begin(); ii < mols.block(ai).end(); ii++)
                 {
-                    aj = index[j];
-
-                    /* Compute distance */
-                    if (bMol)
+                    /* Loop over atoms/molecules (only half a matrix) */
+                    for (j = i + 1; (j < nindex); j++)
                     {
-                        GMX_RELEASE_ASSERT(mols.numBlocks() > 0,
-                                           "Cannot access index[] from empty mols");
                         bSame = FALSE;
-                        for (ii = mols.block(ai).begin(); !bSame && ii < mols.block(ai).end(); ii++)
+                        if(cs_map[i][j]) continue;
+                        aj = index[j];
+
+                        for (jj = mols.block(aj).begin(); jj < mols.block(aj).end(); jj++)
                         {
-                            for (jj = mols.block(aj).begin(); !bSame && jj < mols.block(aj).end(); jj++)
+                            if (bPBC)
                             {
-                                if (bPBC)
-                                {
-                                    pbc_dx(&pbc, x[ii], x[jj], dx);
-                                }
-                                else
-                                {
-                                    rvec_sub(x[ii], x[jj], dx);
-                                }
-                                dx2   = iprod(dx, dx);
-                                bSame = (dx2 < cut2);
+                                pbc_dx(&pbc, x[ii], x[jj], dx);
                             }
+                            else
+                            {
+                                rvec_sub(x[ii], x[jj], dx);
+                            }
+                            dx2   = norm2(dx);
+                            bSame = (dx2 < cut2);
+                            if(bSame) break;
                         }
-                    }
-                    else
-                    {
-                        if (bPBC)
+                        if (bSame)
                         {
-                            pbc_dx(&pbc, x[ai], x[aj], dx);
+                            cs_map[i][j] = 1;
                         }
-                        else
-                        {
-                            rvec_sub(x[ai], x[aj], dx);
-                        }
-                        dx2   = iprod(dx, dx);
-                        bSame = (dx2 < cut2);
-                    }
-                    if (bSame)
-                    {
-                        cs_map[i][j] = 1;
                     }
                 }
             }
