@@ -191,7 +191,7 @@ static void clust_size(const char*             ndx,
     snew(clust_size, nindex);
     // cs_map is used as a contact map to allow to parallelise the following loop in the case of molecules
     snew(cs_map, nindex);
-    for(i=0;i<nindex;i++) snew(cs_map, nindex);
+    for(i=0;i<nindex;i++) snew(cs_map[i], nindex);
     cut2   = cut * cut;
     // total number of trajectory frames
     nframe = 0;
