@@ -63,6 +63,7 @@
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/futil.h"
 #include "gromacs/utility/gmxassert.h"
+#include "gromacs/utility/gmxomp.h"
 #include "gromacs/utility/smalloc.h"
 
 static void clust_size(const char*             ndx,
@@ -86,6 +87,7 @@ static void clust_size(const char*             ndx,
                        t_rgb                   rmid,
                        t_rgb                   rhi,
                        int                     ndf,
+                       int                     nThreads,
                        const gmx_output_env_t* oenv)
 {
     FILE *       fp, *gp, *hp, *tp, *cndx;
@@ -104,12 +106,26 @@ static void clust_size(const char*             ndx,
     real          temp, tfac;
     /* Cluster size distribution (matrix) */
     real** cs_dist = nullptr;
+    int**  cs_map = nullptr;
     real   tf, dx2, cut2, *t_x = nullptr, *t_y, cmid, cmax, cav, ekin;
     int    i, j, k, ai, aj, ci, cj, nframe, nclust, n_x, max_size = 0;
     int *  clust_index, *clust_size, *clust_written, max_clust_size, max_clust_ind, nav, nhisto;
     t_rgb  rlo          = { 1.0, 1.0, 1.0 };
     int    frameCounter = 0;
     real   frameTime;
+    
+    const bool bOMP = GMX_OPENMP;
+    int actual_nThreads = 0;
+    if(bOMP) {
+        actual_nThreads = std::min((nThreads <= 0) ? INT_MAX : nThreads, gmx_omp_get_max_threads());
+        gmx_omp_set_num_threads(actual_nThreads);
+        printf("Frame loop parallelized with OpenMP using %i threads.\n", actual_nThreads);
+        fflush(stdout);
+    }
+    else
+    {
+        actual_nThreads = 1;
+    }
 
     clear_trxframe(&fr, TRUE);
     auto timeLabel = output_env_get_time_label(oenv);
@@ -173,6 +189,9 @@ static void clust_size(const char*             ndx,
 
     snew(clust_index, nindex);
     snew(clust_size, nindex);
+    // cs_map is used as a contact map to allow to parallelise the following loop in the case of molecules
+    snew(cs_map, nindex);
+    for(i=0;i<nindex;i++) snew(cs_map, nindex);
     cut2   = cut * cut;
     // total number of trajectory frames
     nframe = 0;
@@ -208,9 +227,62 @@ static void clust_size(const char*             ndx,
             }
 
             /* Loop over atoms/molecules */
+#pragma omp parallel for 
             for (i = 0; (i < nindex); i++)
             {
                 ai = index[i];
+
+                /* Loop over atoms/molecules (only half a matrix) */
+                for (j = i + 1; (j < nindex); j++)
+                {
+                    aj = index[j];
+
+                    /* Compute distance */
+                    if (bMol)
+                    {
+                        GMX_RELEASE_ASSERT(mols.numBlocks() > 0,
+                                           "Cannot access index[] from empty mols");
+                        bSame = FALSE;
+                        for (ii = mols.block(ai).begin(); !bSame && ii < mols.block(ai).end(); ii++)
+                        {
+                            for (jj = mols.block(aj).begin(); !bSame && jj < mols.block(aj).end(); jj++)
+                            {
+                                if (bPBC)
+                                {
+                                    pbc_dx(&pbc, x[ii], x[jj], dx);
+                                }
+                                else
+                                {
+                                    rvec_sub(x[ii], x[jj], dx);
+                                }
+                                dx2   = iprod(dx, dx);
+                                bSame = (dx2 < cut2);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (bPBC)
+                        {
+                            pbc_dx(&pbc, x[ai], x[aj], dx);
+                        }
+                        else
+                        {
+                            rvec_sub(x[ai], x[aj], dx);
+                        }
+                        dx2   = iprod(dx, dx);
+                        bSame = (dx2 < cut2);
+                    }
+                    if (bSame)
+                    {
+                        cs_map[i][j] = 1;
+                    }
+                }
+            }
+            /* This loop is the one to merge the clusters */
+            /* Loop over atoms/molecules */
+            for (i = 0; (i < nindex); i++)
+            {
                 ci = clust_index[i];
 
                 /* Loop over atoms/molecules (only half a matrix) */
@@ -221,46 +293,8 @@ static void clust_size(const char*             ndx,
                     /* If they are not in the same cluster already */
                     if (ci != cj)
                     {
-                        aj = index[j];
-
-                        /* Compute distance */
-                        if (bMol)
-                        {
-                            GMX_RELEASE_ASSERT(mols.numBlocks() > 0,
-                                               "Cannot access index[] from empty mols");
-                            bSame = FALSE;
-                            for (ii = mols.block(ai).begin(); !bSame && ii < mols.block(ai).end(); ii++)
-                            {
-                                for (jj = mols.block(aj).begin(); !bSame && jj < mols.block(aj).end(); jj++)
-                                {
-                                    if (bPBC)
-                                    {
-                                        pbc_dx(&pbc, x[ii], x[jj], dx);
-                                    }
-                                    else
-                                    {
-                                        rvec_sub(x[ii], x[jj], dx);
-                                    }
-                                    dx2   = iprod(dx, dx);
-                                    bSame = (dx2 < cut2);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if (bPBC)
-                            {
-                                pbc_dx(&pbc, x[ai], x[aj], dx);
-                            }
-                            else
-                            {
-                                rvec_sub(x[ai], x[aj], dx);
-                            }
-                            dx2   = iprod(dx, dx);
-                            bSame = (dx2 < cut2);
-                        }
                         /* If distance less than cut-off */
-                        if (bSame)
+                        if (cs_map[i][j])
                         {
                             /* Merge clusters: check for all atoms whether they are in
                              * cluster cj and if so, put them in ci
@@ -535,6 +569,8 @@ int gmx_clustsize(int argc, char* argv[])
         "atom numbers of the largest cluster."
     };
 
+    static int      nThreads = 0;
+
     real     cutoff  = 0.35;
     int      nskip   = 0;
     int      nlevels = 20;
@@ -579,7 +615,17 @@ int gmx_clustsize(int argc, char* argv[])
           FALSE,
           etRVEC,
           { rhi },
-          "RGB values for the color of the highest occupied cluster size" }
+          "RGB values for the color of the highest occupied cluster size" },
+#if GMX_OPENMP
+        { "-nthreads",
+          FALSE,
+          etINT,
+          { &nThreads },
+          "Number of threads used for the parallel loop over autocorrelations. nThreads <= 0 means "
+          "maximum number of threads. Requires linking with OpenMP. The number of threads is "
+          "limited by the number of cores (before OpenMP v.3 ) or environment variable "
+          "OMP_THREAD_LIMIT (OpenMP v.3)" }
+#endif
     };
 #define NPA asize(pa)
     const char *fnNDX, *fnTPR;
@@ -620,7 +666,7 @@ int gmx_clustsize(int argc, char* argv[])
     clust_size(fnNDX, ftp2fn(efTRX, NFILE, fnm), opt2fn("-o", NFILE, fnm), opt2fn("-ow", NFILE, fnm),
                opt2fn("-nc", NFILE, fnm), opt2fn("-ac", NFILE, fnm), opt2fn("-mc", NFILE, fnm),
                opt2fn("-hc", NFILE, fnm), opt2fn("-hct", NFILE, fnm), opt2fn("-ict", NFILE, fnm), opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm),
-               bMol, bPBC, fnTPR, cutoff, nskip, nlevels, rgblo, rgbhi, ndf, oenv);
+               bMol, bPBC, fnTPR, cutoff, nskip, nlevels, rgblo, rgbhi, ndf, nThreads, oenv);
 
     output_env_done(oenv);
 
