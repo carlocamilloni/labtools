@@ -75,13 +75,14 @@ static void clust_size(const char*             ndx,
                        const char*             histo,
                        const char*             histotime,
                        const char*             clustime,
+                       const char*             trmatrix,
                        const char*             tempf,
                        const char*             mcn,
                        gmx_bool                bMol,
                        gmx_bool                bPBC,
                        const char*             tpr,
-                       real                    cut,
-                       real                    mol_cut,
+                       double                    cut,
+                       double                    mol_cut,
                        int                     nskip,
                        int                     nlevels,
                        t_rgb                   rmid,
@@ -102,15 +103,19 @@ static void clust_size(const char*             ndx,
     gmx_mtop_t*   mtop    = nullptr;
     PbcType       pbcType = PbcType::Unset;
     int           ii, jj;
-    real          temp, tfac;
+    double          temp, tfac;
     /* Cluster size distribution (matrix) */
-    real** cs_dist = nullptr;
-    real   tf, dx2, cut2, mcut2, *t_x = nullptr, *t_y, cmid, cmax, cav, ekin;
+    double** cs_dist = nullptr;
+    double** tr_matrix = nullptr;
+    double** rate_matrix = nullptr;
+    double* norm_matrix = nullptr;
+    bool* norm_done = nullptr;
+    double   tf, dx2, cut2, mcut2, *t_x = nullptr, *t_y, cmid, cmax, cav, ekin;
     int    i, j, k, ai, aj, ci, cj, nframe, nclust, n_x, max_size = 0;
-    int *  clust_index, *clust_size, *clust_written, max_clust_size, max_clust_ind, nav, nhisto;
+    int *  clust_index, *index_size, *index_old_size, *clust_size, *clust_written, max_clust_size, max_clust_ind, nav, nhisto;
     t_rgb  rlo          = { 1.0, 1.0, 1.0 };
     int    frameCounter = 0;
-    real   frameTime;
+    double   frameTime;
 
     clear_trxframe(&fr, TRUE);
     auto timeLabel = output_env_get_time_label(oenv);
@@ -173,8 +178,20 @@ static void clust_size(const char*             ndx,
     }
 
     snew(clust_index, nindex);
+    snew(index_size, nindex);
+    snew(index_old_size, nindex);
     snew(clust_size, nindex);
     snew(xcm, nindex);
+    /* transition matrix */
+    snew(tr_matrix, nindex);
+    for(i=0;i<nindex;i++) snew(tr_matrix[i], nindex);
+    /* rate matrix */
+    snew(rate_matrix, nindex);
+    for(i=0;i<nindex;i++) snew(rate_matrix[i], nindex);
+    /* norm needed to calculate the rate and transition matrices */
+    snew(norm_matrix, nindex);
+    /* flag to accumulate correctly the norm matrix */
+    snew(norm_done, nindex);
     mcut2 = mol_cut*mol_cut;
     cut2   = cut * cut;
     // total number of trajectory frames
@@ -208,13 +225,17 @@ static void clust_size(const char*             ndx,
                 clust_index[i] = i;
                 /* Cluster size is indexed with cluster number */
                 clust_size[i] = 1;
+                /* Initially each molecule belongs to a cluster of size 1 */
+                index_size[i] = 1;
+                /* Flag to accumulate the norm matrix */
+                norm_done[i] = FALSE;
             }
             /* calculate the center of each molecule */
             for (i = 0; (i < nindex); i++)
             {   
                 clear_rvec(xcm[i]);
                 ai = index[i];
-                real tm = 0.;
+                double tm = 0.;
                 for (ii = mols.block(ai).begin(); ii < mols.block(ai).end(); ii++)
                 {
                     for (int m = 0; (m < DIM); m++)
@@ -317,6 +338,11 @@ static void clust_size(const char*             ndx,
                     }
                 }
             }
+            for (k = 0; (k < nindex); k++)
+            {
+                 // this tells how large is the cluster to which each molecule belongs
+                 index_size[k] = clust_size[clust_index[k]];
+            }
             n_x++;
             srenew(t_x, n_x);
             if (fr.bTime)
@@ -363,6 +389,23 @@ static void clust_size(const char*             ndx,
                 fprintf(gp, "%14.6e  %10.3f\n", frameTime, cav / nav);
             }
             fprintf(hp, "%14.6e  %10d\n", frameTime, max_clust_size);
+            /* update the transition matrix */
+            if (n_x>1) 
+            {
+                for(i=0;i<nindex;i++)
+                {
+                   // transition from index_old_size[i] to index_size[i]
+                   if(cs_dist[n_x-2][index_old_size[i]-1]>0.)
+                   {
+                     tr_matrix[index_size[i]-1][index_old_size[i]-1]+=1./(cs_dist[n_x-2][index_old_size[i]-1]*((double)index_old_size[i]));
+                     rate_matrix[index_size[i]-1][index_old_size[i]-1]+=1./(cs_dist[n_x-2][index_old_size[i]-1]*((double)index_old_size[i]));
+                     if(!norm_done[index_old_size[i]-1]) norm_matrix[index_old_size[i]-1]+=1.0;
+                     norm_done[index_old_size[i]-1] = TRUE;
+                   }
+                }
+            }
+            /* save index_size so that it can be used to generate the transition matrix */
+            for(i=0;i<nindex;i++) index_old_size[i] = index_size[i]; 
         }
         /* Analyse velocities, if present */
         if (fr.bV)
@@ -387,7 +430,7 @@ static void clust_size(const char*             ndx,
                         if (clust_index[i] == max_clust_ind)
                         {
                             ai     = index[i];
-                            real m = mtopGetAtomMass(mtop, ai, &molb);
+                            double m = mtopGetAtomMass(mtop, ai, &molb);
                             ekin += 0.5 * m * iprod(v[ai], v[ai]);
                         }
                     }
@@ -396,8 +439,6 @@ static void clust_size(const char*             ndx,
                 }
             }
         }
-        // For each molecule we could write to which cluster it belongs, this may be used to write a chain ID to identify each cluster at a given time
-        // but how do you do transition?
         fprintf(cndx, "%10.3f ", frameTime);
         for (i = 0; (i < nindex); i++) fprintf(cndx, "%i ", clust_index[i]);
         fprintf(cndx, "\n");
@@ -463,13 +504,13 @@ static void clust_size(const char*             ndx,
         gmx_ffclose(fp);
     }
 
-    /* Print the real distribution cluster-size/numer, averaged over the trajectory. */
+    /* Print the double distribution cluster-size/numer, averaged over the trajectory. */
     fp     = xvgropen(histo, "Cluster size distribution", "Cluster size", "()", oenv);
     nhisto = 0;
     fprintf(fp, "%5d  %8.3f\n", 0, 0.0);
     for (j = 0; (j < max_size); j++)
     {
-        real nelem = 0;
+        double nelem = 0;
         for (i = 0; (i < n_x); i++)
         {
             nelem += cs_dist[i][j];
@@ -492,6 +533,20 @@ static void clust_size(const char*             ndx,
     }
     fclose(fp); 
 
+    fp = fopen(trmatrix, "w");
+    //fprintf(fp, "# The sum of the rows should be divisible for the oligomer order (that is the row number)\n");
+    //fprintf(fp, "# Rows are transitions toward lower order oligomers\n");
+    //fprintf(fp, "# Columns are transitions toward higher order oligomers\n");
+    for (i = 0; (i < nindex); i++)
+    {
+    	for (j = 0; (j < nindex); j++)
+    	{
+        	fprintf(fp, "%8.6lf ", tr_matrix[i][j]/norm_matrix[j]);
+        }
+        fprintf(fp,"\n");
+    }
+    fclose(fp);
+ 
     fprintf(stderr, "Total number of atoms in clusters =  %d\n", nhisto);
 
     /* Look for the smallest entry that is not zero
@@ -513,8 +568,8 @@ static void clust_size(const char*             ndx,
     fprintf(stderr, "cmid: %g, cmax: %g, max_size: %d\n", cmid, cmax, max_size);
     cmid = 1;
     fp   = gmx_ffopen(xpm, "w");
-    write_xpm3(fp, 0, "Cluster size distribution", "# clusters", timeLabel, "Size", n_x, max_size,
-               t_x, t_y, cs_dist, 0, cmid, cmax, rlo, rmid, rhi, &nlevels);
+    //write_xpm3(fp, 0, "Cluster size distribution", "# clusters", timeLabel, "Size", n_x, max_size,
+    //           (real)t_x, (real)t_y, cs_dist, 0, cmid, cmax, rlo, rmid, rhi, &nlevels);
     gmx_ffclose(fp);
     cmid = 100.0;
     cmax = 0.0;
@@ -532,8 +587,8 @@ static void clust_size(const char*             ndx,
     }
     fprintf(stderr, "cmid: %g, cmax: %g, max_size: %d\n", cmid, cmax, max_size);
     fp = gmx_ffopen(xpmw, "w");
-    write_xpm3(fp, 0, "Weighted cluster size distribution", "Fraction", timeLabel, "Size", n_x,
-               max_size, t_x, t_y, cs_dist, 0, cmid, cmax, rlo, rmid, rhi, &nlevels);
+    //write_xpm3(fp, 0, "Weighted cluster size distribution", "Fraction", timeLabel, "Size", n_x,
+    //           max_size, t_x, t_y, cs_dist, 0, cmid, cmax, rlo, rmid, rhi, &nlevels);
     gmx_ffclose(fp);
     delete mtop;
     sfree(t_x);
@@ -569,8 +624,8 @@ int gmx_clustsize(int argc, char* argv[])
         "atom numbers of the largest cluster."
     };
 
-    real     cutoff  = 0.35;
-    real     mol_cutoff  = 2.00;
+    double     cutoff  = 0.50;
+    double     mol_cutoff  = 6.00;
     int      nskip   = 0;
     int      nlevels = 20;
     int      ndf     = -1;
@@ -633,6 +688,7 @@ int gmx_clustsize(int argc, char* argv[])
         { efXVG, "-hc", "histo-clust", ffWRITE }, { efXVG, "-temp", "temp", ffOPTWR },
         { efDAT, "-hct", "histo-time", ffWRITE },
         { efDAT, "-ict", "clust-index-time", ffWRITE },
+        { efDAT, "-trm", "transition-matrix", ffWRITE },
         { efNDX, "-mcn", "maxclust", ffOPTWR }
     };
 #define NFILE asize(fnm)
@@ -659,7 +715,7 @@ int gmx_clustsize(int argc, char* argv[])
 
     clust_size(fnNDX, ftp2fn(efTRX, NFILE, fnm), opt2fn("-o", NFILE, fnm), opt2fn("-ow", NFILE, fnm),
                opt2fn("-nc", NFILE, fnm), opt2fn("-ac", NFILE, fnm), opt2fn("-mc", NFILE, fnm),
-               opt2fn("-hc", NFILE, fnm), opt2fn("-hct", NFILE, fnm), opt2fn("-ict", NFILE, fnm), opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm),
+               opt2fn("-hc", NFILE, fnm), opt2fn("-hct", NFILE, fnm), opt2fn("-ict", NFILE, fnm), opt2fn("-trm", NFILE, fnm), opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm),
                bMol, bPBC, fnTPR, cutoff, mol_cutoff, nskip, nlevels, rgblo, rgbhi, ndf, oenv);
 
     output_env_done(oenv);
