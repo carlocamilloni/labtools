@@ -207,8 +207,10 @@ static void clust_size(const char*             ndx,
     max_clust_ind  = -1;
     int molb       = 0;
     cndx = fopen(clustime, "w");
+    double frameTimeStep;
     do
     {
+        if(nframe==1) frameTimeStep=fr.time;
         if ((nskip == 0) || ((nskip > 0) && ((nframe % nskip) == 0)))
         {
             if (bPBC)
@@ -392,13 +394,28 @@ static void clust_size(const char*             ndx,
             /* update the transition matrix */
             if (n_x>1) 
             {
+                double Volume = det(fr.box)*0.0006022;  // NA * nm3->m3
+                double Volume2 = Volume*Volume;
+                fprintf(stderr,"%lf\n", frameTimeStep);
                 for(i=0;i<nindex;i++)
                 {
                    // transition from index_old_size[i] to index_size[i]
                    if(cs_dist[n_x-2][index_old_size[i]-1]>0.)
                    {
                      tr_matrix[index_size[i]-1][index_old_size[i]-1]+=1./(cs_dist[n_x-2][index_old_size[i]-1]*((double)index_old_size[i]));
-                     rate_matrix[index_size[i]-1][index_old_size[i]-1]+=1./(cs_dist[n_x-2][index_old_size[i]-1]*((double)index_old_size[i]));
+                     if(index_old_size[i]>index_size[i]) {
+                       /* koff */
+                       rate_matrix[index_size[i]-1][index_old_size[i]-1]+=Volume/(cs_dist[n_x-2][index_old_size[i]-1]*((double)index_old_size[i]));
+                     } else if(index_old_size[i]<index_size[i]){
+                       /* kon */
+                       double fact=0;
+                       for(j=0;j<(index_size[i]-index_old_size[i]);j++) {
+                         fact+=cs_dist[n_x-2][j]*((double)(j+1));
+                       }
+                       fact -= index_old_size[i];
+                       rate_matrix[index_size[i]-1][index_old_size[i]-1]+=Volume2/(cs_dist[n_x-2][index_old_size[i]-1]*((double)index_old_size[i])*fact);
+                     }
+ 
                      if(!norm_done[index_old_size[i]-1]) norm_matrix[index_old_size[i]-1]+=1.0;
                      norm_done[index_old_size[i]-1] = TRUE;
                    }
@@ -547,6 +564,20 @@ static void clust_size(const char*             ndx,
     }
     fclose(fp);
  
+    fp = fopen("rate.dat", "w");
+    //fprintf(fp, "# The sum of the rows should be divisible for the oligomer order (that is the row number)\n");
+    //fprintf(fp, "# Rows are transitions toward lower order oligomers\n");
+    //fprintf(fp, "# Columns are transitions toward higher order oligomers\n");
+    for (i = 0; (i < nindex); i++)
+    {
+    	for (j = 0; (j < nindex); j++)
+    	{
+        	fprintf(fp, "%8.6lf ", rate_matrix[i][j]/norm_matrix[j]);
+        }
+        fprintf(fp,"\n");
+    }
+    fclose(fp);
+
     fprintf(stderr, "Total number of atoms in clusters =  %d\n", nhisto);
 
     /* Look for the smallest entry that is not zero
