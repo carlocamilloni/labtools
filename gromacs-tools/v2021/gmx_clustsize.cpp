@@ -207,8 +207,8 @@ static void clust_size(const char*             ndx,
     max_clust_size = 1;
     max_clust_ind  = -1;
     int molb       = 0;
-    cndx = fopen(clustime, "w");
-    double frameTimeStep=0.;
+    cndx = xvgropen(clustime, "Index of the oligomer to which each monomer belongs", timeLabel, "Monomer index", oenv);
+    double frameTimeStep=1.;
     do
     {
         if(nframe==1&&fr.bTime) frameTimeStep=fr.time;
@@ -471,7 +471,7 @@ static void clust_size(const char*             ndx,
     xvgrclose(gp);
     xvgrclose(hp);
     xvgrclose(tp);
-    fclose(cndx); 
+    xvgrclose(cndx); 
 
     snew(clust_written, nindex);
     if (max_clust_ind >= 0)
@@ -542,22 +542,22 @@ static void clust_size(const char*             ndx,
     fprintf(fp, "%5d  %8.3f\n", j + 1, 0.0);
     xvgrclose(fp);
 
-    fp = fopen(histotime, "w");
+    fp = xvgropen(histotime, "Time Resolved distribution of oligomers order", timeLabel, "# of oligomers of order #", oenv);
     for (i = 0; (i < n_x); i++)
     {
-        fprintf(fp, "%5d ", i);
+        fprintf(fp, "%14.6e ", t_x[i]);
     	for (j = 0; (j < max_size); j++)
     	{
         	fprintf(fp, " %8.3f", cs_dist[i][j]);
         }
         fprintf(fp,"\n");
     }
-    fclose(fp); 
+    xvgrclose(fp); 
 
-    fp = fopen(trmatrix, "w");
-    //fprintf(fp, "# The sum of the rows should be divisible for the oligomer order (that is the row number)\n");
-    //fprintf(fp, "# Rows are transitions toward lower order oligomers\n");
-    //fprintf(fp, "# Columns are transitions toward higher order oligomers\n");
+    fp = xvgropen(trmatrix, "Transition Matrix", "Oligomers order", "Oligomers order", oenv);
+    /* The sum of the rows should be divisible for the oligomer order (that is the row number)\n");
+       Rows are transitions toward lower order oligomers\n");
+       Columns are transitions toward higher order oligomers\n"); */
     for (i = 0; (i < nindex); i++)
     {
     	for (j = 0; (j < nindex); j++)
@@ -566,21 +566,20 @@ static void clust_size(const char*             ndx,
         }
         fprintf(fp,"\n");
     }
-    fclose(fp);
+    xvgrclose(fp);
  
-    fp = fopen(kmatrix, "w");
-    //fprintf(fp, "# The sum of the rows should be divisible for the oligomer order (that is the row number)\n");
-    //fprintf(fp, "# Rows are transitions toward lower order oligomers\n");
-    //fprintf(fp, "# Columns are transitions toward higher order oligomers\n");
+    fp = xvgropen(kmatrix, "Rates Matrix in ps-1", "Oligomers order", "Oligomers order", oenv);
+    /* Rows are transitions toward lower order oligomers\n");
+       Columns are transitions toward higher order oligomers\n"); */
     for (i = 0; (i < nindex); i++)
     {
     	for (j = 0; (j < nindex); j++)
     	{
-        	fprintf(fp, "%8.6lf ", rate_matrix[i][j]/norm_matrix[j]);
+        	fprintf(fp, "%8.6lf ", rate_matrix[i][j]/norm_matrix[j]/frameTimeStep);
         }
         fprintf(fp,"\n");
     }
-    fclose(fp);
+    xvgrclose(fp);
 
     fprintf(stderr, "Total number of atoms in clusters =  %d\n", nhisto);
 
@@ -721,10 +720,10 @@ int gmx_clustsize(int argc, char* argv[])
         { efXPM, "-ow", "csizew", ffWRITE },      { efXVG, "-nc", "nclust", ffWRITE },
         { efXVG, "-mc", "maxclust", ffWRITE },    { efXVG, "-ac", "avclust", ffWRITE },
         { efXVG, "-hc", "histo-clust", ffWRITE }, { efXVG, "-temp", "temp", ffOPTWR },
-        { efDAT, "-hct", "histo-time", ffWRITE },
-        { efDAT, "-ict", "clust-index-time", ffWRITE },
-        { efDAT, "-trm", "transitions-matrix", ffWRITE },
-        { efDAT, "-km", "rates-matrix", ffWRITE },
+        { efXVG, "-hct", "histo-time", ffWRITE },
+        { efXVG, "-ict", "clust-index-time", ffWRITE },
+        { efXVG, "-trm", "transitions-matrix", ffWRITE },
+        { efXVG, "-km", "rates-matrix", ffWRITE },
         { efNDX, "-mcn", "maxclust", ffOPTWR }
     };
 #define NFILE asize(fnm)
