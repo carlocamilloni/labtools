@@ -76,6 +76,7 @@ static void clust_size(const char*             ndx,
                        const char*             histotime,
                        const char*             clustime,
                        const char*             trmatrix,
+                       const char*             kmatrix,
                        const char*             tempf,
                        const char*             mcn,
                        gmx_bool                bMol,
@@ -207,10 +208,10 @@ static void clust_size(const char*             ndx,
     max_clust_ind  = -1;
     int molb       = 0;
     cndx = fopen(clustime, "w");
-    double frameTimeStep;
+    double frameTimeStep=0.;
     do
     {
-        if(nframe==1) frameTimeStep=fr.time;
+        if(nframe==1&&fr.bTime) frameTimeStep=fr.time;
         if ((nskip == 0) || ((nskip > 0) && ((nframe % nskip) == 0)))
         {
             if (bPBC)
@@ -376,6 +377,8 @@ static void clust_size(const char*             ndx,
                 if (ci > 0)
                 {
                     nclust++;
+                    /* this is the cluster size time-resolved distribution 
+                       that is cs[frame][i]=# of oligomers of order (i+1) */
                     cs_dist[n_x - 1][ci - 1] += 1.0;
                     max_size = std::max(max_size, ci);
                     if (ci > 1)
@@ -396,18 +399,19 @@ static void clust_size(const char*             ndx,
             {
                 double Volume = det(fr.box)*0.0006022;  // NA * nm3->m3
                 double Volume2 = Volume*Volume;
-                fprintf(stderr,"%lf\n", frameTimeStep);
                 for(i=0;i<nindex;i++)
                 {
-                   // transition from index_old_size[i] to index_size[i]
+                   // transition from an oligomer of order index_old_size[i] to on of order index_size[i] 
                    if(cs_dist[n_x-2][index_old_size[i]-1]>0.)
                    {
                      tr_matrix[index_size[i]-1][index_old_size[i]-1]+=1./(cs_dist[n_x-2][index_old_size[i]-1]*((double)index_old_size[i]));
                      if(index_old_size[i]>index_size[i]) {
-                       /* koff */
+                       /* k_off */
+                       /* this is 1/([oligomer]) that are dissociating */
                        rate_matrix[index_size[i]-1][index_old_size[i]-1]+=Volume/(cs_dist[n_x-2][index_old_size[i]-1]*((double)index_old_size[i]));
                      } else if(index_old_size[i]<index_size[i]){
-                       /* kon */
+                       /* k_on */
+                       /* this is 1/([oligomer_ligand][oligomer_reactants]) that are associating */
                        double fact=0;
                        for(j=0;j<(index_size[i]-index_old_size[i]);j++) {
                          fact+=cs_dist[n_x-2][j]*((double)(j+1));
@@ -564,7 +568,7 @@ static void clust_size(const char*             ndx,
     }
     fclose(fp);
  
-    fp = fopen("rate.dat", "w");
+    fp = fopen(kmatrix, "w");
     //fprintf(fp, "# The sum of the rows should be divisible for the oligomer order (that is the row number)\n");
     //fprintf(fp, "# Rows are transitions toward lower order oligomers\n");
     //fprintf(fp, "# Columns are transitions toward higher order oligomers\n");
@@ -719,7 +723,8 @@ int gmx_clustsize(int argc, char* argv[])
         { efXVG, "-hc", "histo-clust", ffWRITE }, { efXVG, "-temp", "temp", ffOPTWR },
         { efDAT, "-hct", "histo-time", ffWRITE },
         { efDAT, "-ict", "clust-index-time", ffWRITE },
-        { efDAT, "-trm", "transition-matrix", ffWRITE },
+        { efDAT, "-trm", "transitions-matrix", ffWRITE },
+        { efDAT, "-km", "rates-matrix", ffWRITE },
         { efNDX, "-mcn", "maxclust", ffOPTWR }
     };
 #define NFILE asize(fnm)
@@ -746,8 +751,8 @@ int gmx_clustsize(int argc, char* argv[])
 
     clust_size(fnNDX, ftp2fn(efTRX, NFILE, fnm), opt2fn("-o", NFILE, fnm), opt2fn("-ow", NFILE, fnm),
                opt2fn("-nc", NFILE, fnm), opt2fn("-ac", NFILE, fnm), opt2fn("-mc", NFILE, fnm),
-               opt2fn("-hc", NFILE, fnm), opt2fn("-hct", NFILE, fnm), opt2fn("-ict", NFILE, fnm), opt2fn("-trm", NFILE, fnm), opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm),
-               bMol, bPBC, fnTPR, cutoff, mol_cutoff, nskip, nlevels, rgblo, rgbhi, ndf, oenv);
+               opt2fn("-hc", NFILE, fnm), opt2fn("-hct", NFILE, fnm), opt2fn("-ict", NFILE, fnm), opt2fn("-trm", NFILE, fnm), opt2fn("-km", NFILE, fnm), 
+               opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm), bMol, bPBC, fnTPR, cutoff, mol_cutoff, nskip, nlevels, rgblo, rgbhi, ndf, oenv);
 
     output_env_done(oenv);
 
