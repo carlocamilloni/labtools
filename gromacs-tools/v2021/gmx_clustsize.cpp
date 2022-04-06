@@ -463,6 +463,46 @@ static void clust_size(const char*             ndx,
         fprintf(cndx, "%10.3f ", frameTime);
         for (i = 0; (i < nindex); i++) fprintf(cndx, "%i ", clust_index[i]);
         fprintf(cndx, "\n");
+
+        int largest=10;
+        /* index file per frame per size */
+        snew(clust_written, nindex);
+        {
+         for(int oligsize=2;oligsize<=largest;oligsize++) {
+           std::string ndx_name = "cs_" +std::to_string(oligsize) + "_" + std::to_string(nframe) + ".ndx";
+           fp = gmx_ffopen(ndx_name.c_str(), "w");
+           if (bMol)
+           {    
+              for (int i = 0; (i < nindex); i++)
+              {
+                 // this tells how large is the cluster to which each molecule belongs
+	         ci = clust_index[i];
+	         if(clust_written[ci]==1) continue;
+                 if(index_size[i] == oligsize) {
+                   fprintf(fp, "[ clust %i ]\n", ci);
+                   for (int j : mols.block(i))
+                   {
+                     fprintf(fp, "%d\n", j+1);
+                   }
+	           for(int j=i+1; (j < nindex); j++)
+	           {
+	              if(clust_index[j]==ci) 
+	              {
+                         for (int k : mols.block(j))
+                         {
+                            fprintf(fp, "%d\n", k+1);
+                         }
+	              }
+	           }
+	           clust_written[ci]=1;
+	        }
+             }
+           }
+           gmx_ffclose(fp);
+          }
+        }
+        sfree(clust_written);
+
         nframe++;
     } while (read_next_frame(oenv, status, &fr));
     close_trx(status);
