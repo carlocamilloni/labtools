@@ -82,8 +82,9 @@ static void clust_size(const char*             ndx,
                        gmx_bool                bMol,
                        gmx_bool                bPBC,
                        const char*             tpr,
-                       double                    cut,
-                       double                    mol_cut,
+                       double                  cut,
+                       double                  mol_cut,
+                       int                     bOndx,
                        int                     nskip,
                        int                     nlevels,
                        t_rgb                   rmid,
@@ -464,42 +465,35 @@ static void clust_size(const char*             ndx,
         for (i = 0; (i < nindex); i++) fprintf(cndx, "%i ", clust_index[i]);
         fprintf(cndx, "\n");
 
-        int largest=10;
-        /* index file per frame per size */
-        snew(clust_written, nindex);
+        if((bOndx>1) && (bMol)) 
         {
-         for(int oligsize=2;oligsize<=largest;oligsize++) {
-           std::string ndx_name = "cs_" +std::to_string(oligsize) + "_" + std::to_string(nframe) + ".ndx";
-           fp = gmx_ffopen(ndx_name.c_str(), "w");
-           if (bMol)
-           {    
-              for (int i = 0; (i < nindex); i++)
-              {
-                 // this tells how large is the cluster to which each molecule belongs
-	         ci = clust_index[i];
-	         if(clust_written[ci]==1) continue;
-                 if(index_size[i] == oligsize) {
-                   fprintf(fp, "[ clust %i ]\n", ci);
-                   for (int j : mols.block(i))
-                   {
-                     fprintf(fp, "%d\n", j+1);
-                   }
-	           for(int j=i+1; (j < nindex); j++)
-	           {
-	              if(clust_index[j]==ci) 
-	              {
-                         for (int k : mols.block(j))
-                         {
-                            fprintf(fp, "%d\n", k+1);
-                         }
-	              }
-	           }
-	           clust_written[ci]=1;
+            int largest=bOndx;
+            /* index file per frame per size */
+            snew(clust_written, nindex);
+            for(int oligsize=2;oligsize<=largest;oligsize++) {
+                std::string ndx_name = "cs_" +std::to_string(oligsize) + "_" + std::to_string(nframe) + ".ndx";
+                fp = gmx_ffopen(ndx_name.c_str(), "w");
+                for (int i = 0; (i < nindex); i++)
+                {
+                    // this tells how large is the cluster to which each molecule belongs
+	            ci = clust_index[i];
+	            if(clust_written[ci]==1) continue;
+                    if(index_size[i] == oligsize) 
+                    {
+                        fprintf(fp, "[ clust %i ]\n", ci);
+                        for (int j : mols.block(i)) fprintf(fp, "%d\n", j+1);
+	                for(int j=i+1; (j < nindex); j++)
+	                {
+	                    if(clust_index[j]==ci) 
+	                    {
+                                for (int k : mols.block(j)) fprintf(fp, "%d\n", k+1);
+                            }
+	                }
+	            }
+	            clust_written[ci]=1;
 	        }
-             }
-           }
-           gmx_ffclose(fp);
-          }
+                gmx_ffclose(fp);
+            }
         }
         sfree(clust_written);
 
@@ -700,6 +694,7 @@ int gmx_clustsize(int argc, char* argv[])
 
     double     cutoff  = 0.50;
     double     mol_cutoff  = 6.00;
+    int      bOndx   = 0;
     int      nskip   = 0;
     int      nlevels = 20;
     int      ndf     = -1;
@@ -726,6 +721,11 @@ int gmx_clustsize(int argc, char* argv[])
           etBOOL,
           { &bMol },
           "Cluster molecules rather than atoms (needs [REF].tpr[ref] file)" },
+        { "-tr_olig_ndx",
+          FALSE,
+          etINT,
+          { &bOndx },
+          "write index files for all oligomers size from 2 to tr_olig_ndx for every frame, it could enerate A LOT of files" },
         { "-pbc", FALSE, etBOOL, { &bPBC }, "Use periodic boundary conditions" },
         { "-nskip", FALSE, etINT, { &nskip }, "Number of frames to skip between writing" },
         { "-nlevels",
@@ -791,7 +791,7 @@ int gmx_clustsize(int argc, char* argv[])
     clust_size(fnNDX, ftp2fn(efTRX, NFILE, fnm), opt2fn("-o", NFILE, fnm), opt2fn("-ow", NFILE, fnm),
                opt2fn("-nc", NFILE, fnm), opt2fn("-ac", NFILE, fnm), opt2fn("-mc", NFILE, fnm),
                opt2fn("-hc", NFILE, fnm), opt2fn("-hct", NFILE, fnm), opt2fn("-ict", NFILE, fnm), opt2fn("-trm", NFILE, fnm), opt2fn("-km", NFILE, fnm), 
-               opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm), bMol, bPBC, fnTPR, cutoff, mol_cutoff, nskip, nlevels, rgblo, rgbhi, ndf, oenv);
+               opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm), bMol, bPBC, fnTPR, cutoff, mol_cutoff, bOndx, nskip, nlevels, rgblo, rgbhi, ndf, oenv);
 
     output_env_done(oenv);
 
