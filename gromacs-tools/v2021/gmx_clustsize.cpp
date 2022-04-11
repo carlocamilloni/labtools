@@ -489,13 +489,13 @@ static void clust_size(const char*             ndx,
                                 for (int k : mols.block(j)) fprintf(fp, "%d\n", k+1);
                             }
 	                }
+	                clust_written[ci]=1;
 	            }
-	            clust_written[ci]=1;
 	        }
                 gmx_ffclose(fp);
             }
+            sfree(clust_written);
         }
-        sfree(clust_written);
 
         nframe++;
     } while (read_next_frame(oenv, status, &fr));
