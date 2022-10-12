@@ -86,7 +86,7 @@ rcoulomb                 = 1.0
 epsilon_r                = 1
 epsilon_rf               = 1
 ; Method for doing Van der Waals
-vdw-type                 = cut-off
+vdw-type                 = pme 
 vdw-modifier             = Potential-shift
 ; cut-off lengths       
 rvdw-switch              = 0
