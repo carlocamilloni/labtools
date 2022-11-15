@@ -699,6 +699,204 @@ static void clust_size(const char*             ndx,
     sfree(index);
 }
 
+static void do_interm_mat(const char*             trx,
+                          const char*             outfile,
+                          gmx_bool                bPBC,
+                          const char*             tpr,
+                          double                  cut,
+                          double                  mol_cut,
+                          int                     nskip,
+                          const gmx_output_env_t* oenv)
+{
+    t_trxframe    fr;
+    clear_trxframe(&fr, TRUE);
+
+    t_trxstatus* status;
+    if (!read_first_frame(oenv, &status, trx, &fr, TRX_NEED_X | TRX_READ_V))
+    {
+        gmx_file(trx);
+    }
+
+    int natoms = fr.natoms;
+    rvec *x = fr.x;
+
+    TpxFileHeader tpxh;
+    gmx_mtop_t    mtop;
+    PbcType pbcType = PbcType::Unset;
+    if (tpr)
+    {
+        tpxh = readTpxHeader(tpr, true);
+        if (tpxh.natoms != natoms)
+        {
+            gmx_fatal(FARGS, "tpr (%d atoms) and trajectory (%d atoms) do not match!", tpxh.natoms, natoms);
+        }
+        pbcType = read_tpx(tpr, nullptr, nullptr, &natoms, nullptr, nullptr, &mtop);
+    }
+
+    gmx::RangePartitioning mols;
+    GMX_RELEASE_ASSERT(tpr, "Cannot access topology without having read it from TPR");
+    mols = gmx_mtop_molecules(mtop);
+
+    // number of molecules
+    int nindex = mols.numBlocks();
+    // number of atoms per molecule, assuming them identical
+    int natmol = mols.block(0).end();
+
+    double **interm_mat = nullptr;    
+    double **interm_mat_dist = nullptr;    
+    double **interm_mat_dist12 = nullptr;    
+    double **this_frame_interm_mat_dist = nullptr;    
+    double **this_frame_interm_mat_dist12 = nullptr;    
+    int **added = nullptr;    
+    snew(added, natmol);
+    snew(interm_mat, natmol);
+    snew(interm_mat_dist, natmol);
+    snew(this_frame_interm_mat_dist, natmol);
+    snew(interm_mat_dist12, natmol);
+    snew(this_frame_interm_mat_dist12, natmol);
+    for (int i=0; i<natmol; i++) {
+        snew(added[i], natmol);
+        snew(interm_mat[i],natmol);
+        snew(interm_mat_dist[i], natmol);
+        snew(this_frame_interm_mat_dist[i], natmol);
+        snew(interm_mat_dist12[i], natmol);
+        snew(this_frame_interm_mat_dist12[i], natmol);
+    }
+
+    // vector of center of masses
+    rvec *xcm = nullptr;
+    snew(xcm, nindex);
+
+    double mcut2 = mol_cut*mol_cut;
+    double cut2   = cut * cut;
+    // total number of trajectory frames
+    int nframe = 0;
+    // number of analysed frames
+    int n_x = 0;
+
+    do
+    {
+        if ((nskip == 0) || ((nskip > 0) && ((nframe % nskip) == 0)))
+        {
+            t_pbc pbc;
+            if (bPBC) set_pbc(&pbc, pbcType, fr.box);
+
+            /* calculate the center of each molecule */
+            for (int i = 0; (i < nindex); i++)
+            {   
+                clear_rvec(xcm[i]);
+                double tm = 0.;
+                for (int ii = mols.block(i).begin(); ii < mols.block(i).end(); ii++)
+                {
+                    for (int m = 0; (m < DIM); m++)
+                    {
+                        xcm[i][m] += x[ii][m];
+                    }
+                    tm += 1.0; 
+                }
+                for (int m = 0; (m < DIM); m++)
+                {
+                    xcm[i][m] /= tm;
+                }
+            }
+
+            for(int i=0; i<natmol; i++) {
+               for(int j=0; j<natmol; j++) {
+                  this_frame_interm_mat_dist[i][j] = 100.;
+                  this_frame_interm_mat_dist12[i][j] = 0.;
+               }
+            }
+
+            /* Loop over molecules */
+            for (int i = 0; (i < nindex); i++)
+            {
+                for (int ii = 0; ii < natmol; ii++) {
+                    for(int jj = 0; jj < natmol; jj++) {
+                        added[ii][jj] = 0;
+                    }
+                }
+
+                /* Loop over molecules (only half a matrix) */
+                //for (int j = i + 1; (j < nindex); j++)
+                for (int j = 0; (j < nindex); j++)
+                {
+                    if(i==j) continue;
+                    rvec dx;
+                    if (bPBC) pbc_dx(&pbc, xcm[i], xcm[j], dx);
+                    else rvec_sub(xcm[i], xcm[j], dx);
+                    double dx2   = norm2(dx);
+                    if (dx2 > mcut2) continue;
+
+                    /* Compute distance */
+                    int a_i = 0;
+                    GMX_RELEASE_ASSERT(mols.numBlocks() > 0,"Cannot access index[] from empty mols");
+                    for (int ii = mols.block(i).begin(); ii < mols.block(i).end(); ii++)
+                    {
+                        int a_j = 0;
+                        for (int jj = mols.block(j).begin(); jj < mols.block(j).end(); jj++)
+                        {
+                            if (bPBC) pbc_dx(&pbc, x[ii], x[jj], dx);
+                            else rvec_sub(x[ii], x[jj], dx);
+                            double dx2 = iprod(dx, dx);
+                            if(dx2 < cut2) {
+                                double id12 = std::pow(1./dx2,6);
+                                if(!added[a_i][a_j]) {
+                                   interm_mat[a_i][a_j] += 1./(static_cast<double>(nindex)); // to account for the symmetric matrix
+                                   added[a_i][a_j] = 1;
+                                }
+                                this_frame_interm_mat_dist[a_i][a_j] = std::min(this_frame_interm_mat_dist[a_i][a_j], dx2);
+                                this_frame_interm_mat_dist12[a_i][a_j] = std::max(this_frame_interm_mat_dist12[a_i][a_j], id12);
+                            }
+                            a_j++;
+                        }
+                        a_i++;
+                    }
+                }
+            }
+            for(int i=0; i<natmol; i++) {
+               for(int j=0; j<natmol; j++) {
+                  interm_mat_dist[i][j] += sqrt(this_frame_interm_mat_dist[i][j]);
+                  interm_mat_dist12[i][j] += this_frame_interm_mat_dist12[i][j];
+               }
+            }
+            n_x++;
+        }
+        nframe++;
+    } while (read_next_frame(oenv, status, &fr));
+    close_trx(status);
+    done_frame(&fr);
+
+    // normalisations
+    for(int i=0; i<natmol; i++) {
+       for(int j=0; j<natmol; j++) {
+          interm_mat[i][j] /= static_cast<double>(n_x);
+          interm_mat_dist[i][j] /= static_cast<double>(n_x);
+          interm_mat_dist12[i][j] = std::pow(interm_mat_dist12[i][j]/static_cast<double>(n_x), -1./12.);
+       }
+    }
+   
+    FILE *fp = nullptr;
+    fp = gmx_ffopen(outfile, "w");
+    for(int i=0; i<natmol; i++) {
+       for(int j=0; j<natmol; j++) {
+          fprintf(fp, "%u %u %lf %lf %lf\n", i+1, j+1, interm_mat_dist[i][j], interm_mat_dist12[i][j], interm_mat[i][j]);
+       }
+    }
+    gmx_ffclose(fp);
+
+    for(int i=0; i<natmol; i++) {
+       sfree(added[i]);
+       sfree(interm_mat[i]);
+       sfree(interm_mat_dist[i]);
+       sfree(this_frame_interm_mat_dist[i]);
+    }
+    sfree(added);
+    sfree(interm_mat);
+    sfree(interm_mat_dist);
+    sfree(this_frame_interm_mat_dist);
+    sfree(xcm);
+}
+
 int gmx_clustsize(int argc, char* argv[])
 {
     const char* desc[] = {
@@ -728,6 +926,7 @@ int gmx_clustsize(int argc, char* argv[])
     int      ndf     = -1;
     gmx_bool bMol    = FALSE;
     gmx_bool bPBC    = TRUE;
+    gmx_bool iMAT    = FALSE;
     rvec     rlo     = { 1.0, 1.0, 0.0 };
     rvec     rhi     = { 0.0, 0.0, 1.0 };
 
@@ -749,6 +948,11 @@ int gmx_clustsize(int argc, char* argv[])
           etBOOL,
           { &bMol },
           "Cluster molecules rather than atoms (needs [REF].tpr[ref] file)" },
+        { "-inter_mol",
+          FALSE,
+          etBOOL,
+          { &iMAT },
+          "Perform an intermolecular interactions analysis (needs [REF].tpr[ref] file)" },
         { "-tr_olig_ndx",
           FALSE,
           etINT,
@@ -792,7 +996,8 @@ int gmx_clustsize(int argc, char* argv[])
         { efXVG, "-ict", "clust-index-time", ffWRITE },
         { efXVG, "-trm", "transitions-matrix", ffWRITE },
         { efXVG, "-km", "rates-matrix", ffWRITE },
-        { efNDX, "-mcn", "maxclust", ffOPTWR }
+        { efNDX, "-mcn", "maxclust", ffOPTWR },
+        { efNDX, "-imat", "intermat", ffOPTWR }
     };
 #define NFILE asize(fnm)
 
@@ -802,6 +1007,8 @@ int gmx_clustsize(int argc, char* argv[])
         return 0;
     }
 
+    if(iMAT) bMol = TRUE;
+ 
     fnNDX   = ftp2fn_null(efNDX, NFILE, fnm);
     rgblo.r = rlo[XX];
     rgblo.g = rlo[YY];
@@ -816,6 +1023,7 @@ int gmx_clustsize(int argc, char* argv[])
         gmx_fatal(FARGS, "You need a tpr file for the -mol option");
     }
 
+    if(!iMAT)
     clust_size(fnNDX,
                ftp2fn(efTRX, NFILE, fnm),
                opt2fn("-o", NFILE, fnm),
@@ -842,6 +1050,16 @@ int gmx_clustsize(int argc, char* argv[])
                rgbhi,
                ndf,
                oenv);
+
+    else if(iMAT)
+    do_interm_mat(ftp2fn(efTRX, NFILE, fnm),
+                  opt2fn("-imat", NFILE, fnm),
+                  bPBC,
+                  fnTPR,
+                  cutoff,
+                  mol_cutoff,
+                  nskip,
+                  oenv);
 
     output_env_done(oenv);
 
