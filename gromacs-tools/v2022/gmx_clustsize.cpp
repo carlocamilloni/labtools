@@ -718,8 +718,6 @@ static void do_interm_mat(const char*             trx,
         gmx_file(trx);
     }
 
-    printf("%lf\n", cut);
-
     int natoms = fr.natoms;
     rvec *x = fr.x;
 
