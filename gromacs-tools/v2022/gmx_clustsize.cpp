@@ -700,7 +700,8 @@ static void clust_size(const char*             ndx,
 }
 
 static void do_interm_mat(const char*             trx,
-                          const char*             outfile,
+                          const char*             outfile_inter,
+                          const char*             outfile_intra,
                           gmx_bool                bPBC,
                           const char*             tpr,
                           double                  cut,
@@ -716,6 +717,8 @@ static void do_interm_mat(const char*             trx,
     {
         gmx_file(trx);
     }
+
+    printf("%lf\n", cut);
 
     int natoms = fr.natoms;
     rvec *x = fr.x;
@@ -745,22 +748,31 @@ static void do_interm_mat(const char*             trx,
     double **interm_mat = nullptr;    
     double **interm_mat_dist = nullptr;    
     double **interm_mat_dist12 = nullptr;    
-    double **this_frame_interm_mat_dist = nullptr;    
-    double **this_frame_interm_mat_dist12 = nullptr;    
+    double **inter_dist_count = nullptr;  
+    double **intram_mat = nullptr;    
+    double **intram_mat_dist = nullptr;    
+    double **intram_mat_dist12 = nullptr;    
+    double **intra_dist_count = nullptr;  
     int **added = nullptr;    
     snew(added, natmol);
     snew(interm_mat, natmol);
     snew(interm_mat_dist, natmol);
-    snew(this_frame_interm_mat_dist, natmol);
     snew(interm_mat_dist12, natmol);
-    snew(this_frame_interm_mat_dist12, natmol);
+    snew(inter_dist_count, natmol);
+    snew(intram_mat, natmol);
+    snew(intram_mat_dist, natmol);
+    snew(intram_mat_dist12, natmol);
+    snew(intra_dist_count, natmol);
     for (int i=0; i<natmol; i++) {
         snew(added[i], natmol);
         snew(interm_mat[i],natmol);
         snew(interm_mat_dist[i], natmol);
-        snew(this_frame_interm_mat_dist[i], natmol);
         snew(interm_mat_dist12[i], natmol);
-        snew(this_frame_interm_mat_dist12[i], natmol);
+        snew(inter_dist_count[i], natmol);
+        snew(intram_mat[i],natmol);
+        snew(intram_mat_dist[i], natmol);
+        snew(intram_mat_dist12[i], natmol);
+        snew(intra_dist_count[i], natmol);
     }
 
     // vector of center of masses
@@ -800,15 +812,8 @@ static void do_interm_mat(const char*             trx,
                 }
             }
 
-            for(int i=0; i<natmol; i++) {
-               for(int j=0; j<natmol; j++) {
-                  this_frame_interm_mat_dist[i][j] = 100.;
-                  this_frame_interm_mat_dist12[i][j] = 0.;
-               }
-            }
-
             /* Loop over molecules */
-            for (int i = 0; (i < nindex); i++)
+            for (int i = 0; i < nindex; i++)
             {
                 for (int ii = 0; ii < natmol; ii++) {
                     for(int jj = 0; jj < natmol; jj++) {
@@ -816,11 +821,9 @@ static void do_interm_mat(const char*             trx,
                     }
                 }
 
-                /* Loop over molecules (only half a matrix) */
-                //for (int j = i + 1; (j < nindex); j++)
-                for (int j = 0; (j < nindex); j++)
+                /* Loop over molecules  */
+                for (int j = 0; j < nindex; j++)
                 {
-                    if(i==j) continue;
                     rvec dx;
                     if (bPBC) pbc_dx(&pbc, xcm[i], xcm[j], dx);
                     else rvec_sub(xcm[i], xcm[j], dx);
@@ -840,24 +843,26 @@ static void do_interm_mat(const char*             trx,
                             double dx2 = iprod(dx, dx);
                             if(dx2 < cut2) {
                                 double id12 = std::pow(1./dx2,6);
-                                if(!added[a_i][a_j]) {
-                                   interm_mat[a_i][a_j] += 1./(static_cast<double>(nindex)); // to account for the symmetric matrix
-                                   added[a_i][a_j] = 1;
+                                if(i!=j) { // intermolecular 
+                                   if(!added[a_i][a_j]) {
+                                      interm_mat[a_i][a_j] += 1./(static_cast<double>(nindex));
+                                      added[a_i][a_j] = 1;
+                                   }
+                                   interm_mat_dist[a_i][a_j] += sqrt(dx2);
+                                   interm_mat_dist12[a_i][a_j] += id12;
+                                   inter_dist_count[a_i][a_j]+=1.;
+                                } else { // intramolecular
+                                   intram_mat[a_i][a_j] += 1./(static_cast<double>(nindex));
+                                   intram_mat_dist[a_i][a_j] += sqrt(dx2);
+                                   intram_mat_dist12[a_i][a_j] += id12;
+                                   intra_dist_count[a_i][a_j]+=1.;
                                 }
-                                this_frame_interm_mat_dist[a_i][a_j] = std::min(this_frame_interm_mat_dist[a_i][a_j], dx2);
-                                this_frame_interm_mat_dist12[a_i][a_j] = std::max(this_frame_interm_mat_dist12[a_i][a_j], id12);
                             }
                             a_j++;
                         }
                         a_i++;
                     }
                 }
-            }
-            for(int i=0; i<natmol; i++) {
-               for(int j=0; j<natmol; j++) {
-                  interm_mat_dist[i][j] += sqrt(this_frame_interm_mat_dist[i][j]);
-                  interm_mat_dist12[i][j] += this_frame_interm_mat_dist12[i][j];
-               }
             }
             n_x++;
         }
@@ -870,16 +875,37 @@ static void do_interm_mat(const char*             trx,
     for(int i=0; i<natmol; i++) {
        for(int j=0; j<natmol; j++) {
           interm_mat[i][j] /= static_cast<double>(n_x);
-          interm_mat_dist[i][j] /= static_cast<double>(n_x);
-          interm_mat_dist12[i][j] = std::pow(interm_mat_dist12[i][j]/static_cast<double>(n_x), -1./12.);
+          if(inter_dist_count[i][j] > 0) {
+             interm_mat_dist12[i][j] = std::pow(interm_mat_dist12[i][j]/inter_dist_count[i][j], -1./12.);
+             interm_mat_dist[i][j] /= inter_dist_count[i][j];
+          } else {
+             interm_mat_dist12[i][j] = 0.;
+             interm_mat_dist[i][j] = 0.;
+          }
+          intram_mat[i][j] /= static_cast<double>(n_x);
+          if(intra_dist_count[i][j] > 0) {
+             intram_mat_dist12[i][j] = std::pow(intram_mat_dist12[i][j]/intra_dist_count[i][j], -1./12.);
+             intram_mat_dist[i][j] /= intra_dist_count[i][j];
+          } else {
+             intram_mat_dist12[i][j] = 0.;
+             intram_mat_dist[i][j] = 0.;
+          }
        }
     }
    
     FILE *fp = nullptr;
-    fp = gmx_ffopen(outfile, "w");
+    fp = gmx_ffopen(outfile_inter, "w");
     for(int i=0; i<natmol; i++) {
        for(int j=0; j<natmol; j++) {
-          fprintf(fp, "%u %u %lf %lf %lf\n", i+1, j+1, interm_mat_dist[i][j], interm_mat_dist12[i][j], interm_mat[i][j]);
+          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, j+1, interm_mat_dist[i][j], interm_mat_dist12[i][j], interm_mat[i][j]);
+       }
+    }
+    gmx_ffclose(fp);
+
+    fp = gmx_ffopen(outfile_intra, "w");
+    for(int i=0; i<natmol; i++) {
+       for(int j=0; j<natmol; j++) {
+          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, j+1, intram_mat_dist[i][j], intram_mat_dist12[i][j], intram_mat[i][j]);
        }
     }
     gmx_ffclose(fp);
@@ -888,12 +914,22 @@ static void do_interm_mat(const char*             trx,
        sfree(added[i]);
        sfree(interm_mat[i]);
        sfree(interm_mat_dist[i]);
-       sfree(this_frame_interm_mat_dist[i]);
+       sfree(interm_mat_dist12[i]);
+       sfree(inter_dist_count[i]);
+       sfree(intram_mat[i]);
+       sfree(intram_mat_dist[i]);
+       sfree(intram_mat_dist12[i]);
+       sfree(intra_dist_count[i]);
     }
     sfree(added);
     sfree(interm_mat);
     sfree(interm_mat_dist);
-    sfree(this_frame_interm_mat_dist);
+    sfree(interm_mat_dist12);
+    sfree(inter_dist_count);
+    sfree(intram_mat);
+    sfree(intram_mat_dist);
+    sfree(intram_mat_dist12);
+    sfree(intra_dist_count);
     sfree(xcm);
 }
 
@@ -918,8 +954,8 @@ int gmx_clustsize(int argc, char* argv[])
         "atom numbers of the largest cluster."
     };
 
-    double     cutoff  = 0.50;
-    double     mol_cutoff  = 6.00;
+    real     cutoff     = 0.50;
+    real     mol_cutoff = 6.00;
     int      bOndx   = 0;
     int      nskip   = 0;
     int      nlevels = 20;
@@ -997,7 +1033,8 @@ int gmx_clustsize(int argc, char* argv[])
         { efXVG, "-trm", "transitions-matrix", ffWRITE },
         { efXVG, "-km", "rates-matrix", ffWRITE },
         { efNDX, "-mcn", "maxclust", ffOPTWR },
-        { efNDX, "-imat", "intermat", ffOPTWR }
+        { efNDX, "-irmat", "intermat", ffOPTWR },
+        { efNDX, "-iamat", "intramat", ffOPTWR }
     };
 #define NFILE asize(fnm)
 
@@ -1053,7 +1090,8 @@ int gmx_clustsize(int argc, char* argv[])
 
     else if(iMAT)
     do_interm_mat(ftp2fn(efTRX, NFILE, fnm),
-                  opt2fn("-imat", NFILE, fnm),
+                  opt2fn("-irmat", NFILE, fnm),
+                  opt2fn("-iamat", NFILE, fnm),
                   bPBC,
                   fnTPR,
                   cutoff,

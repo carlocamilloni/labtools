@@ -692,8 +692,8 @@ int gmx_clustsize(int argc, char* argv[])
         "atom numbers of the largest cluster."
     };
 
-    double     cutoff  = 0.50;
-    double     mol_cutoff  = 6.00;
+    real     cutoff = 0.50;
+    real     mol_cutoff = 6.00;
     int      bOndx   = 0;
     int      nskip   = 0;
     int      nlevels = 20;
