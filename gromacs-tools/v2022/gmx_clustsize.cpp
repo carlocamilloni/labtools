@@ -844,7 +844,9 @@ static void do_interm_mat(const char*             trx,
                                 if(i!=j) { // intermolecular 
                                    if(!added[a_i][a_j]) {
                                       interm_mat[a_i][a_j] += 1./(static_cast<double>(nindex));
+                                      if(a_i!=a_j) interm_mat[a_j][a_i] += 1./(static_cast<double>(nindex));
                                       added[a_i][a_j] = 1;
+                                      added[a_j][a_i] = 1;
                                    }
                                    interm_mat_dist[a_i][a_j] += sqrt(dx2);
                                    interm_mat_dist12[a_i][a_j] += id12;
