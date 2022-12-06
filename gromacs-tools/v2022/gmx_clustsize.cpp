@@ -699,6 +699,17 @@ static void clust_size(const char*             ndx,
     sfree(index);
 }
 
+static inline unsigned find_first_max(const std::vector<int> &v)
+{
+   for (unsigned i = 0; i < v.size()-1; i++) {
+       if ((v[i+1]<v[i])&&(v[i+1]>0)) { 
+          return i; 
+       }
+   }
+   // if I do not find anything I just get the max
+   return std::distance(v.begin(), std::max_element(v.begin(), v.end()));
+}
+
 static void do_interm_mat(const char*             trx,
                           const char*             outfile_inter,
                           const char*             outfile_intra,
@@ -745,32 +756,34 @@ static void do_interm_mat(const char*             trx,
 
     double **interm_mat = nullptr;    
     double **interm_mat_dist = nullptr;    
+    std::vector<std::vector<std::vector<int> > > interm_mat_histo(natmol, std::vector<std::vector<int>>(natmol, std::vector<int>(110,0)));    
+    std::vector<std::vector<std::vector<int> > > intram_mat_histo(natmol, std::vector<std::vector<int>>(natmol, std::vector<int>(110,0)));    
     double **interm_mat_dist12 = nullptr;    
-    double **inter_dist_count = nullptr;  
+    double **inter_dist12_count = nullptr;  
     double **intram_mat = nullptr;    
     double **intram_mat_dist = nullptr;    
     double **intram_mat_dist12 = nullptr;    
-    double **intra_dist_count = nullptr;  
+    double **intra_dist12_count = nullptr;  
     int **added = nullptr;    
     snew(added, natmol);
     snew(interm_mat, natmol);
     snew(interm_mat_dist, natmol);
     snew(interm_mat_dist12, natmol);
-    snew(inter_dist_count, natmol);
+    snew(inter_dist12_count, natmol);
     snew(intram_mat, natmol);
     snew(intram_mat_dist, natmol);
     snew(intram_mat_dist12, natmol);
-    snew(intra_dist_count, natmol);
+    snew(intra_dist12_count, natmol);
     for (int i=0; i<natmol; i++) {
         snew(added[i], natmol);
         snew(interm_mat[i],natmol);
         snew(interm_mat_dist[i], natmol);
         snew(interm_mat_dist12[i], natmol);
-        snew(inter_dist_count[i], natmol);
+        snew(inter_dist12_count[i], natmol);
         snew(intram_mat[i],natmol);
         snew(intram_mat_dist[i], natmol);
         snew(intram_mat_dist12[i], natmol);
-        snew(intra_dist_count[i], natmol);
+        snew(intra_dist12_count[i], natmol);
     }
 
     // vector of center of masses
@@ -848,14 +861,16 @@ static void do_interm_mat(const char*             trx,
                                       added[a_i][a_j] = 1;
                                       added[a_j][a_i] = 1;
                                    }
-                                   interm_mat_dist[a_i][a_j] += sqrt(dx2);
+                                   //interm_mat_dist[a_i][a_j] += sqrt(dx2);
+                                   interm_mat_histo[a_i][a_j][static_cast<unsigned>(std::floor(sqrt(dx2)/(cut/110.)))]++;
                                    interm_mat_dist12[a_i][a_j] += id12;
-                                   inter_dist_count[a_i][a_j]+=1.;
+                                   inter_dist12_count[a_i][a_j]+=1.;
                                 } else { // intramolecular
                                    intram_mat[a_i][a_j] += 1./(static_cast<double>(nindex));
-                                   intram_mat_dist[a_i][a_j] += sqrt(dx2);
+                                   //intram_mat_dist[a_i][a_j] += sqrt(dx2);
+                                   intram_mat_histo[a_i][a_j][static_cast<unsigned>(std::floor(sqrt(dx2)/(cut/110.)))]++;
                                    intram_mat_dist12[a_i][a_j] += id12;
-                                   intra_dist_count[a_i][a_j]+=1.;
+                                   intra_dist12_count[a_i][a_j]+=1.;
                                 }
                             }
                             a_j++;
@@ -871,25 +886,30 @@ static void do_interm_mat(const char*             trx,
     close_trx(status);
     done_frame(&fr);
 
+    printf("Done!\n"); fflush(stdout);
+
     // normalisations
     for(int i=0; i<natmol; i++) {
        for(int j=0; j<natmol; j++) {
           interm_mat[i][j] /= static_cast<double>(n_x);
-          if(inter_dist_count[i][j] > 0) {
-             interm_mat_dist12[i][j] = std::pow(interm_mat_dist12[i][j]/inter_dist_count[i][j], -1./12.);
-             interm_mat_dist[i][j] /= inter_dist_count[i][j];
+          if(inter_dist12_count[i][j] > 0) {
+             interm_mat_dist12[i][j] = std::pow(interm_mat_dist12[i][j]/inter_dist12_count[i][j], -1./12.);
           } else {
              interm_mat_dist12[i][j] = 0.;
-             interm_mat_dist[i][j] = 0.;
           }
+          double d1 = static_cast<double>(find_first_max(interm_mat_histo[i][j]));
+          if(d1>0) interm_mat_dist[i][j] = cut/110.*d1+cut/220.;
+          else interm_mat_dist[i][j] = 0.;
+
           intram_mat[i][j] /= static_cast<double>(n_x);
-          if(intra_dist_count[i][j] > 0) {
-             intram_mat_dist12[i][j] = std::pow(intram_mat_dist12[i][j]/intra_dist_count[i][j], -1./12.);
-             intram_mat_dist[i][j] /= intra_dist_count[i][j];
+          if(intra_dist12_count[i][j] > 0) {
+             intram_mat_dist12[i][j] = std::pow(intram_mat_dist12[i][j]/intra_dist12_count[i][j], -1./12.);
           } else {
              intram_mat_dist12[i][j] = 0.;
-             intram_mat_dist[i][j] = 0.;
           }
+          double d2 = static_cast<double>(find_first_max(intram_mat_histo[i][j]));
+          if(d2>0) intram_mat_dist[i][j] = cut/110.*d2+cut/220.;
+          else  intram_mat_dist[i][j] = 0.;
        }
     }
    
@@ -897,7 +917,7 @@ static void do_interm_mat(const char*             trx,
     fp = gmx_ffopen(outfile_inter, "w");
     for(int i=0; i<natmol; i++) {
        for(int j=0; j<natmol; j++) {
-          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, j+1, interm_mat_dist[i][j], interm_mat_dist12[i][j], interm_mat[i][j]);
+          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, j+1, interm_mat_dist12[i][j], interm_mat_dist[i][j], interm_mat[i][j]);
        }
     }
     gmx_ffclose(fp);
@@ -905,7 +925,7 @@ static void do_interm_mat(const char*             trx,
     fp = gmx_ffopen(outfile_intra, "w");
     for(int i=0; i<natmol; i++) {
        for(int j=0; j<natmol; j++) {
-          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, j+1, intram_mat_dist[i][j], intram_mat_dist12[i][j], intram_mat[i][j]);
+          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, j+1, intram_mat_dist12[i][j], intram_mat_dist[i][j], intram_mat[i][j]);
        }
     }
     gmx_ffclose(fp);
@@ -915,21 +935,21 @@ static void do_interm_mat(const char*             trx,
        sfree(interm_mat[i]);
        sfree(interm_mat_dist[i]);
        sfree(interm_mat_dist12[i]);
-       sfree(inter_dist_count[i]);
+       sfree(inter_dist12_count[i]);
        sfree(intram_mat[i]);
        sfree(intram_mat_dist[i]);
        sfree(intram_mat_dist12[i]);
-       sfree(intra_dist_count[i]);
+       sfree(intra_dist12_count[i]);
     }
     sfree(added);
     sfree(interm_mat);
     sfree(interm_mat_dist);
     sfree(interm_mat_dist12);
-    sfree(inter_dist_count);
+    sfree(inter_dist12_count);
     sfree(intram_mat);
     sfree(intram_mat_dist);
     sfree(intram_mat_dist12);
-    sfree(intra_dist_count);
+    sfree(intra_dist12_count);
     sfree(xcm);
 }
 
