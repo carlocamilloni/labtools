@@ -969,7 +969,7 @@ static void do_interm_mat(const char*             trx,
           intram_mat[i][j] /= static_cast<double>(n_x);
           if(intra_dist12_count[i][j] > 0) {
              intram_mat_dist12[i][j] = std::pow(intram_mat_dist12[i][j]/intra_dist12_count[i][j], -1./12.);
-             intram_mat_dist[i][j] = intram_mat_dist12[i][j]/intra_dist12_count[i][j];
+             intram_mat_dist[i][j] = intram_mat_dist[i][j]/intra_dist12_count[i][j];
           } else {
              intram_mat_dist12[i][j] = 0.;
              intram_mat_dist[i][j] = 0.;
