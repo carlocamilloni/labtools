@@ -700,6 +700,16 @@ static void clust_size(const char*             ndx,
     sfree(index);
 }
 
+static inline unsigned is_repulsive(const double d, const double dexp, const std::vector<int> &v)
+{
+    unsigned is_rep = 0;
+    unsigned max_i = std::distance(v.begin(), std::max_element(v.begin(), v.end()));
+    if((d>0.51)&&((d-dexp)>0.04)&&(max_i>v.size()-3)) is_rep = 1;
+    else is_rep = 0;
+
+    return is_rep;
+}
+
 static inline unsigned find_first_max(const std::vector<int> &v)
 {
    unsigned max_i = std::distance(v.begin(), std::max_element(v.begin(), v.end()));
@@ -883,7 +893,8 @@ static void do_interm_mat(const char*             trx,
                             else rvec_sub(x[ii], x[jj], dx);
                             double dx2 = iprod(dx, dx);
                             if(dx2 < cut2) {
-                                double id12 = std::pow(1./dx2,6);
+                                //double id12 = std::pow(1./dx2,6);
+                                double id12 = std::exp(1./sqrt(dx2)/0.01);
                                 if(i!=j) { // intermolecular 
                                    if(!added[a_i][a_j]) {
                                       interm_mat[a_i][a_j] += 1./(static_cast<double>(nindex));
@@ -950,7 +961,8 @@ static void do_interm_mat(const char*             trx,
        for(int j=0; j<natmol; j++) {
           interm_mat[i][j] /= static_cast<double>(n_x);
           if(inter_dist12_count[i][j] > 0) {
-             interm_mat_dist12[i][j] = std::pow(interm_mat_dist12[i][j]/inter_dist12_count[i][j], -1./12.);
+             //interm_mat_dist12[i][j] = std::pow(interm_mat_dist12[i][j]/inter_dist12_count[i][j], -1./12.);
+             interm_mat_dist12[i][j] = 100./std::log(interm_mat_dist12[i][j]/inter_dist12_count[i][j]);
              interm_mat_dist[i][j] = interm_mat_dist[i][j]/inter_dist12_count[i][j];
           } else {
              interm_mat_dist12[i][j] = 0.;
@@ -968,7 +980,8 @@ static void do_interm_mat(const char*             trx,
 
           intram_mat[i][j] /= static_cast<double>(n_x);
           if(intra_dist12_count[i][j] > 0) {
-             intram_mat_dist12[i][j] = std::pow(intram_mat_dist12[i][j]/intra_dist12_count[i][j], -1./12.);
+             //intram_mat_dist12[i][j] = std::pow(intram_mat_dist12[i][j]/intra_dist12_count[i][j], -1./12.);
+             intram_mat_dist12[i][j] = 100./std::log(intram_mat_dist12[i][j]/intra_dist12_count[i][j]);
              intram_mat_dist[i][j] = intram_mat_dist[i][j]/intra_dist12_count[i][j];
           } else {
              intram_mat_dist12[i][j] = 0.;
@@ -989,7 +1002,8 @@ static void do_interm_mat(const char*             trx,
     fp = gmx_ffopen(outfile_inter, "w");
     for(int i=0; i<natmol; i++) {
        for(int j=0; j<natmol; j++) {
-          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, j+1, interm_mat_dist[i][j], interm_mat_dist12[i][j], interm_mat[i][j]);
+          unsigned is_rep = is_repulsive(interm_mat_dist[i][j], interm_mat_dist12[i][j], interm_mat_histo[i][j]);
+          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf %9.6lf %2i\n", i+1, j+1, interm_mat_dist[i][j], interm_mat_dist12[i][j], (is_rep)?interm_mat_dist12[i][j]:interm_mat_dist[i][j], interm_mat[i][j], (is_rep)?-1:1);
        }
     }
     gmx_ffclose(fp);
@@ -997,7 +1011,8 @@ static void do_interm_mat(const char*             trx,
     fp = gmx_ffopen(outfile_intra, "w");
     for(int i=0; i<natmol; i++) {
        for(int j=0; j<natmol; j++) {
-          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, j+1, intram_mat_dist[i][j], intram_mat_dist12[i][j], intram_mat[i][j]);
+          unsigned is_rep = is_repulsive(intram_mat_dist[i][j], intram_mat_dist12[i][j], intram_mat_histo[i][j]);
+          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf %9.6lf %2i\n", i+1, j+1, intram_mat_dist[i][j], intram_mat_dist12[i][j], (is_rep)?intram_mat_dist12[i][j]:intram_mat_dist[i][j], intram_mat[i][j], (is_rep)?-1:1);
        }
     }
     gmx_ffclose(fp);
