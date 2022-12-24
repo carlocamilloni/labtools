@@ -1017,6 +1017,7 @@ int gmx_clustsize(int argc, char* argv[])
     gmx_bool bMol    = FALSE;
     gmx_bool bPBC    = TRUE;
     gmx_bool iMAT    = FALSE;
+    gmx_bool iMAThis = FALSE;
     rvec     rlo     = { 1.0, 1.0, 0.0 };
     rvec     rhi     = { 0.0, 0.0, 1.0 };
 
