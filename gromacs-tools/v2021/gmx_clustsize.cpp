@@ -672,11 +672,12 @@ static void clust_size(const char*             ndx,
     sfree(index);
 }
 
-static inline unsigned is_repulsive(const double d, const double dexp, const std::vector<int> &v)
+static inline unsigned is_repulsive(const double d, const double d12, const double dexp, const std::vector<int> &v)
 {
     unsigned is_rep = 0;
     unsigned max_i = std::distance(v.begin(), std::max_element(v.begin(), v.end()));
-    if((d>0.51)&&((d-dexp)>0.04)&&(max_i>v.size()-3)) is_rep = 1;
+    //if((d>0.51)&&((d-dexp)>0.04)&&(max_i>v.size()-3)) is_rep = 1;
+    if(((0.55/d)<1.1)&&((d/d12)<1.05)&&(max_i>v.size()-3)) is_rep = 1;
     else is_rep = 0;
 
     return is_rep;
@@ -793,7 +794,7 @@ static void do_interm_mat(const char*             trx,
             std::vector<std::vector<double> > intram_mat_Mdist12(natmol, std::vector<double>(natmol, 0.));    
             std::vector<std::vector<double> > interm_mat_MdistExp(natmol, std::vector<double>(natmol, 0.));    
             std::vector<std::vector<double> > intram_mat_MdistExp(natmol, std::vector<double>(natmol, 0.));    
-
+   
             /* Loop over molecules */
             for (int i = 0; i < nindex; i++)
             {
@@ -831,7 +832,7 @@ static void do_interm_mat(const char*             trx,
                             double dx2 = iprod(dx, dx);
                             if(dx2 < cut2) {
                                 double id12 = std::pow(1./dx2,6);
-                                double idexp = std::exp(1./sqrt(dx2)/0.01);
+                                double idexp = std::exp(1./sqrt(dx2)/0.05);
                                 if(i!=j) { // intermolecular 
                                    if(!added[a_i][a_j]) {
                                       interm_mat[a_i][a_j] += 1./(static_cast<double>(nindex));
@@ -896,7 +897,7 @@ static void do_interm_mat(const char*             trx,
           if(interm_mat_dist_count[i][j] > 0) {
              interm_mat_dist[i][j] = interm_mat_dist[i][j]/interm_mat_dist_count[i][j];
              interm_mat_dist12[i][j] = std::pow(interm_mat_dist12[i][j]/interm_mat_dist_count[i][j], -1./12.);
-             interm_mat_distExp[i][j] = 100./std::log(interm_mat_distExp[i][j]/interm_mat_dist_count[i][j]);
+             interm_mat_distExp[i][j] = 20./std::log(interm_mat_distExp[i][j]/interm_mat_dist_count[i][j]);
           } else {
              interm_mat_dist[i][j] = 0.;
              interm_mat_dist12[i][j] = 0.;
@@ -919,7 +920,7 @@ static void do_interm_mat(const char*             trx,
           if(intram_mat_dist_count[i][j] > 0) {
              intram_mat_dist[i][j] = intram_mat_dist[i][j]/intram_mat_dist_count[i][j];
              intram_mat_dist12[i][j] = std::pow(intram_mat_dist12[i][j]/intram_mat_dist_count[i][j], -1./12.);
-             intram_mat_distExp[i][j] = 100./std::log(intram_mat_distExp[i][j]/intram_mat_dist_count[i][j]);
+             intram_mat_distExp[i][j] = 20./std::log(intram_mat_distExp[i][j]/intram_mat_dist_count[i][j]);
           } else {
              intram_mat_dist[i][j] = 0.;
              intram_mat_dist12[i][j] = 0.;
@@ -943,8 +944,8 @@ static void do_interm_mat(const char*             trx,
     fp = gmx_ffopen(outfile_inter, "w");
     for(int i=0; i<natmol; i++) {
        for(int j=0; j<natmol; j++) {
-          unsigned is_rep = is_repulsive(interm_mat_dist[i][j], interm_mat_distExp[i][j], interm_mat_histo[i][j]);
-          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf %9.6lf %2i\n", i+1, j+1, interm_mat_dist12[i][j], interm_mat_distExp[i][j], (is_rep)?interm_mat_distExp[i][j]:interm_mat_dist12[i][j], interm_mat[i][j], (is_rep)?-1:1);
+          unsigned is_rep = is_repulsive(interm_mat_dist[i][j], interm_mat_dist12[i][j], interm_mat_distExp[i][j], interm_mat_histo[i][j]);
+          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf %9.6lf %9.6lf %2i\n", i+1, j+1, interm_mat_dist[i][j], interm_mat_dist12[i][j], interm_mat_distExp[i][j], (is_rep)?interm_mat_distExp[i][j]:interm_mat_dist12[i][j], interm_mat[i][j], (is_rep)?-1:1);
        }
     }
     gmx_ffclose(fp);
@@ -952,8 +953,8 @@ static void do_interm_mat(const char*             trx,
     fp = gmx_ffopen(outfile_intra, "w");
     for(int i=0; i<natmol; i++) {
        for(int j=0; j<natmol; j++) {
-          unsigned is_rep = is_repulsive(intram_mat_dist[i][j], intram_mat_distExp[i][j], intram_mat_histo[i][j]);
-          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf %9.6lf %2i\n", i+1, j+1, intram_mat_dist12[i][j], intram_mat_distExp[i][j], (is_rep)?intram_mat_distExp[i][j]:intram_mat_dist12[i][j], intram_mat[i][j], (is_rep)?-1:1);
+          unsigned is_rep = is_repulsive(intram_mat_dist[i][j], intram_mat_dist12[i][j], intram_mat_distExp[i][j], intram_mat_histo[i][j]);
+          fprintf(fp, "%4i %4i %9.6lf %9.6lf %9.6lf %9.6lf %9.6lf %2i\n", i+1, j+1, intram_mat_dist[i][j], intram_mat_dist12[i][j], intram_mat_distExp[i][j], (is_rep)?intram_mat_distExp[i][j]:intram_mat_dist12[i][j], intram_mat[i][j], (is_rep)?-1:1);
        }
     }
     gmx_ffclose(fp);
