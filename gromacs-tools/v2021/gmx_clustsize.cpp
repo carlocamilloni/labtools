@@ -87,6 +87,7 @@ static void clust_size(const char*             ndx,
                        double                  mol_cut,
                        int                     bOndx,
                        int                     nskip,
+                       int                     skip_last_nmol,
                        int                     nlevels,
                        t_rgb                   rmid,
                        t_rgb                   rhi,
@@ -166,7 +167,7 @@ static void clust_size(const char*             ndx,
         mols = gmx_mtop_molecules(*mtop);
 
         /* Make dummy index */
-        nindex = mols.numBlocks();
+        nindex = mols.numBlocks()-skip_last_nmol;
         snew(index, nindex);
         for (i = 0; (i < nindex); i++)
         {
@@ -274,7 +275,7 @@ static void clust_size(const char*             ndx,
                     {
                         rvec_sub(xcm[i], xcm[j], dx);
                     }
-                    dx2   = norm2(dx);
+                    dx2   = iprod(dx, dx);
 
                     if (dx2 > mcut2) continue;
 
@@ -681,6 +682,7 @@ static void do_interm_mat(const char*             trx,
                           double                  mol_cut,
                           double                  d_pow,
                           int                     nskip,
+                          int                     skip_last_nmol,
                           gmx_bool                write_histo,
                           const gmx_output_env_t* oenv)
 {
@@ -715,9 +717,45 @@ static void do_interm_mat(const char*             trx,
     mols = gmx_mtop_molecules(*mtop);
 
     // number of molecules
-    int nindex = mols.numBlocks();
-    // number of atoms per molecule, assuming them identical
-    int natmol = mols.block(0).end();
+    int nindex = mols.numBlocks()-skip_last_nmol;
+    std::vector<int> num_mol;
+    num_mol.push_back(1);
+    int num_unique_molecules=0;
+    // number of atoms per molecule, assuming them identicaln when consecutive molecules have the same number of atoms
+    std::vector<int> natmol2;
+    natmol2.push_back(mols.block(0).end());
+    for(unsigned i=1; i<nindex; i++) {
+       natmol2.push_back(mols.block(i).end()-mols.block(i-1).end());
+       if(natmol2[i]==natmol2[i-1]) num_mol[num_unique_molecules]++;
+       else {
+         num_mol.push_back(1);
+         num_unique_molecules++;
+       }
+    }
+    std::vector<int>::iterator it = std::unique(natmol2.begin(), natmol2.end());  
+    natmol2.resize(std::distance(natmol2.begin(),it));
+
+    std::vector<int> start_index;
+    std::vector<double> inv_num_mol;
+    start_index.push_back(0); 
+    num_unique_molecules=0;
+    inv_num_mol.push_back(1./(static_cast<double>(num_mol[num_unique_molecules])));
+    for(unsigned i=1; i<nindex; i++) {
+       if(mols.block(i).end()-mols.block(i-1).end()==natmol2[num_unique_molecules]) {
+          start_index.push_back(start_index[i-1]);
+       } else {
+          start_index.push_back(natmol2[num_unique_molecules]);
+          num_unique_molecules++;
+       }
+       inv_num_mol.push_back(1./static_cast<double>(num_mol[num_unique_molecules]));
+    }
+
+    printf("number of different molecules %u\n", natmol2.size());
+    for(unsigned i=0; i<natmol2.size();i++) printf("mol %u num %u size %u\n", i, num_mol[i], natmol2[i]);
+    //for(unsigned i=0; i<nindex;i++) printf("start_idnex %u %u\n", i, start_index[i]);
+    //for(unsigned i=0; i<nindex;i++) printf("invnummol %u %lf\n", i, inv_num_mol[i]);
+    int natmol = std::accumulate(natmol2.begin(), natmol2.end(), 0);
+    printf("Number of unique atoms %u\n", natmol);
 
     // matrix atm x atm for probabilities
     std::vector<std::vector<double> > interm_mat(natmol, std::vector<double>(natmol, 0.));    
@@ -799,15 +837,17 @@ static void do_interm_mat(const char*             trx,
                     rvec dx;
                     if (bPBC) pbc_dx(&pbc, xcm[i], xcm[j], dx);
                     else rvec_sub(xcm[i], xcm[j], dx);
-                    double dx2   = norm2(dx);
+                    double dx2   = iprod(dx, dx);
                     if (dx2 > mcut2) continue;
 
                     /* Compute distance */
-                    int a_i = 0;
+                    int a_i = start_index[i];
+                    if(start_index[i]!=start_index[j]&&j<i) continue;
+                    double norm = std::max(inv_num_mol[i],inv_num_mol[j]);
                     GMX_RELEASE_ASSERT(mols.numBlocks() > 0,"Cannot access index[] from empty mols");
                     for (int ii = mols.block(i).begin(); ii < mols.block(i).end(); ii++)
                     {
-                        int a_j = 0;
+                        int a_j = start_index[j];
                         for (int jj = mols.block(j).begin(); jj < mols.block(j).end(); jj++)
                         {
                             if (bPBC) pbc_dx(&pbc, x[ii], x[jj], dx);
@@ -817,8 +857,8 @@ static void do_interm_mat(const char*             trx,
                                 double id12 = std::pow(1./dx2,-0.5*d_pow);
                                 if(i!=j) { // intermolecular 
                                    if(!added[a_i][a_j]) {
-                                      interm_mat[a_i][a_j] += 1./(static_cast<double>(nindex));
-                                      if(a_i!=a_j) interm_mat[a_j][a_i] += 1./(static_cast<double>(nindex));
+                                      interm_mat[a_i][a_j] +=  norm; //1./(static_cast<double>(nindex));
+                                      if(a_i!=a_j) interm_mat[a_j][a_i] += norm; //1./(static_cast<double>(nindex));
                                       added[a_i][a_j] = 1;
                                       added[a_j][a_i] = 1;
                                    }
@@ -827,7 +867,7 @@ static void do_interm_mat(const char*             trx,
                                    interm_mat_Mdist12[a_i][a_j] = std::max(interm_mat_Mdist12[a_i][a_j], id12);
                                    interm_mat_Mdist12[a_j][a_i] = std::max(interm_mat_Mdist12[a_i][a_j], id12);
                                 } else { // intramolecular
-                                   intram_mat[a_i][a_j] += 1./(static_cast<double>(nindex));
+                                   intram_mat[a_i][a_j] += norm; //1./(static_cast<double>(nindex));
                                    intram_mat_mdist[a_i][a_j] = std::min(intram_mat_mdist[a_i][a_j], sqrt(dx2));
                                    intram_mat_mdist[a_j][a_i] = std::min(intram_mat_mdist[a_i][a_j], sqrt(dx2));
                                    intram_mat_Mdist12[a_i][a_j] = std::max(intram_mat_Mdist12[a_i][a_j], id12);
@@ -953,6 +993,7 @@ int gmx_clustsize(int argc, char* argv[])
     real     d_pow = -6.;
     int      bOndx   = 0;
     int      nskip   = 0;
+    int      skip_last_nmol = 0;
     int      nlevels = 20;
     int      ndf     = -1;
     gmx_bool bMol    = FALSE;
@@ -990,6 +1031,7 @@ int gmx_clustsize(int argc, char* argv[])
           etBOOL,
           { &iMAThis },
           "with -inter_mol plots the histogram of the distances for all pairs (needs [REF].tpr[ref] file)" },
+        { "-skip_last_nmol", FALSE, etINT, { &skip_last_nmol }, "Number of molecules to skip (from the end)" },
         { "-tr_olig_ndx",
           FALSE,
           etINT,
@@ -1066,7 +1108,7 @@ int gmx_clustsize(int argc, char* argv[])
     clust_size(fnNDX, ftp2fn(efTRX, NFILE, fnm), opt2fn("-o", NFILE, fnm), opt2fn("-ow", NFILE, fnm),
                opt2fn("-nc", NFILE, fnm), opt2fn("-ac", NFILE, fnm), opt2fn("-mc", NFILE, fnm),
                opt2fn("-hc", NFILE, fnm), opt2fn("-hct", NFILE, fnm), opt2fn("-ict", NFILE, fnm), opt2fn("-trm", NFILE, fnm), opt2fn("-km", NFILE, fnm), 
-               opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm), bMol, bPBC, fnTPR, cutoff, mol_cutoff, bOndx, nskip, nlevels, rgblo, rgbhi, ndf, oenv);
+               opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm), bMol, bPBC, fnTPR, cutoff, mol_cutoff, bOndx, nskip, skip_last_nmol, nlevels, rgblo, rgbhi, ndf, oenv);
 
     else if(iMAT)
     do_interm_mat(ftp2fn(efTRX, NFILE, fnm),
@@ -1078,6 +1120,7 @@ int gmx_clustsize(int argc, char* argv[])
                   mol_cutoff,
                   d_pow,
                   nskip,
+                  skip_last_nmol,
                   iMAThis,
                   oenv);
 
