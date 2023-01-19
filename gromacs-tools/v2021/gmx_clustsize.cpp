@@ -840,7 +840,7 @@ static void do_interm_mat(const char*             trx,
                     xcm[i][m] /= tm;
                 }
             }
-   
+
             /* Loop over molecules */
             for (int i = 0; i < nindex; i++)
             {
@@ -855,7 +855,7 @@ static void do_interm_mat(const char*             trx,
                 std::vector<std::vector<double> > intram_mat_Mdist12(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[i]], 0.));    
                 std::vector<std::vector<std::vector<double> > > interm_cross_mat_mdist((natmol2.size()*(natmol2.size()-1))/2);
                 std::vector<std::vector<std::vector<double> > > interm_cross_mat_Mdist12((natmol2.size()*(natmol2.size()-1))/2); 
-                for (int j = mol_id[i+1]; j < natmol2.size(); j++) {
+                for (int j = mol_id[i]+1; j < natmol2.size(); j++) {
                     interm_cross_mat_mdist[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[j]], 100.));    
                     interm_cross_mat_Mdist12[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[j]], 0.));
                     added_cross[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<int>(natmol2[mol_id[j]], 0));

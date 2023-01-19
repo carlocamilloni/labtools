@@ -882,7 +882,7 @@ static void do_interm_mat(const char*             trx,
                 std::vector<std::vector<double> > intram_mat_Mdist12(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[i]], 0.));    
                 std::vector<std::vector<std::vector<double> > > interm_cross_mat_mdist((natmol2.size()*(natmol2.size()-1))/2);
                 std::vector<std::vector<std::vector<double> > > interm_cross_mat_Mdist12((natmol2.size()*(natmol2.size()-1))/2); 
-                for (int j = mol_id[i+1]; j < natmol2.size(); j++) {
+                for (int j = mol_id[i]+1; j < natmol2.size(); j++) {
                     interm_cross_mat_mdist[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[j]], 100.));    
                     interm_cross_mat_Mdist12[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[j]], 0.));
                     added_cross[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<int>(natmol2[mol_id[j]], 0));
@@ -1101,7 +1101,7 @@ int gmx_clustsize(int argc, char* argv[])
         "atom numbers of the largest cluster."
     };
 
-    real     cutoff     = 0.50;
+    real     cutoff = 0.50;
     real     mol_cutoff = 6.00;
     real     d_pow = -6.;
     int      bOndx   = 0;
