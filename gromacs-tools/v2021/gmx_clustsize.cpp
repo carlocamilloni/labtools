@@ -815,6 +815,8 @@ static void do_interm_mat(const char*             trx,
     // number of analysed frames
     int n_x = 0;
 
+    printf("Ready!\n"); fflush(stdout);
+
     do
     {
         if ((nskip == 0) || ((nskip > 0) && ((nframe % nskip) == 0)))
@@ -840,7 +842,7 @@ static void do_interm_mat(const char*             trx,
                     xcm[i][m] /= tm;
                 }
             }
-
+   
             /* Loop over molecules */
             for (int i = 0; i < nindex; i++)
             {
@@ -860,7 +862,6 @@ static void do_interm_mat(const char*             trx,
                     interm_cross_mat_Mdist12[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[j]], 0.));
                     added_cross[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<int>(natmol2[mol_id[j]], 0));
                 }
-
                 /* Loop over molecules  */
                 for (int j = 0; j < nindex; j++)
                 {
@@ -899,7 +900,7 @@ static void do_interm_mat(const char*             trx,
                                       interm_same_mat_Mdist12[a_j][a_i] = std::max(interm_same_mat_Mdist12[a_i][a_j], id12);
                                    } else { // inter cross molecule specie
                                       if(!added_cross[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j]) {
-                                        interm_cross_mat[mol_id[i]][a_i][a_j] +=  norm;
+                                        interm_cross_mat[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j] +=  norm;
                                         added_cross[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j] = 1;
                                       }
                                       interm_cross_mat_mdist[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j] = std::min(interm_cross_mat_mdist[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j], sqrt(dx2));
@@ -936,7 +937,7 @@ static void do_interm_mat(const char*             trx,
                 }
                 for (int j = mol_id[i]+1; j < natmol2.size(); j++) {
                    for(int ii=0; ii<natmol2[mol_id[i]]; ii++) {
-                      for(int jj=0; jj<natmol2[mol_id[i]]; jj++) {
+                      for(int jj=0; jj<natmol2[mol_id[j]]; jj++) {
                          if(interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj]<100.) {
                            if(write_histo) interm_cross_mat_histo[cross_index[mol_id[i]][j]][ii][jj][static_cast<unsigned>(std::floor(interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj]/(cut/55.)))]++;
                            interm_cross_mat_dist[cross_index[mol_id[i]][j]][ii][jj] += interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj];
