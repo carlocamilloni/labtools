@@ -1,5 +1,6 @@
 import math
 import sys
+import numpy as np
 
 # read FILE with CVs and weights
 FILENAME_ = sys.argv[1]
@@ -78,10 +79,11 @@ ndata = len(cv_list)
 nblock = int(ndata/BSIZE_)
 
 # prepare histo dictionaries
-histo_ave = {} ; histo_ave2 = {}; hblock = {};
-
+histo_ave_block = []; histo_ave = {} ;  
+ww_2=0; ww_blocco = [];
 # cycle on blocks
 for iblock in range(0, nblock):
+    ww_tmp=0
     # define range in CV
     i0 = iblock * BSIZE_ 
     i1 = i0 + BSIZE_
@@ -90,17 +92,20 @@ for iblock in range(0, nblock):
     for i in range(i0, i1):
         if cv_list[i] in histo: histo[cv_list[i]] += w_list[i]
         else:                   histo[cv_list[i]]  = w_list[i] 
+        ww_tmp += w_list[i]
+    ww_blocco.append(ww_tmp)
+    histo_ave_block.append({})
+    for i in range(0,ndata): histo_ave_block[iblock][cv_list[i]]  = 0.
     # add to global histo dictionary
-    for key in histo: 
+    for key in histo:
+        histo_ave_block[iblock][key] += histo[key]
         if key in histo_ave: 
            histo_ave[key]   += histo[key]
-           histo_ave2[key]  += histo[key] * histo[key]
-           if(hblock[key] < iblock+1): hblock[key] += 1
         else:
            histo_ave[key]   = histo[key]
-           histo_ave2[key]  = histo[key] * histo[key]
-           hblock[key] = 1
+    ww_2 += ww_tmp *ww_tmp
 
+meff= np.sum(ww_blocco)*np.sum(ww_blocco)/ww_2
 max_histo=max(list(histo_ave.values()))
  
 # print out fes and error 
@@ -126,22 +131,20 @@ for i in range(0, nbins):
     for x in xs:
         log.write("%12.6lf " % x)
     # calculate fes
-    nb = float(nblock)  
-    if key in histo_ave:
-       # average and variance 
-       aveh = histo_ave[key] / nb 
-       s2h  = (histo_ave2[key]/nb-aveh*aveh) * nb / ( nb - 1.0 )
+    if key in histo_ave_block[0]:
+       aveh = 0.; s2h=0.;
+       # average and variance
+       for iblock in range(0, nblock):
+           aveh += histo_ave_block[iblock][key]/ww_blocco[iblock] * ww_blocco[iblock]/np.sum(ww_blocco)
+       for iblock in range(0, nblock):
+           s2h  += np.power(histo_ave_block[iblock][key]/ww_blocco[iblock] -aveh,2) *ww_blocco[iblock]/np.sum(ww_blocco) * meff / ( meff - 1.0 ) 
        # error
-       errh = math.sqrt( s2h / nb )
+       errh = math.sqrt( s2h / meff)
        # free energy and error
-       fes = -KBT_ * math.log(aveh) + KBT_ * math.log(max_histo / nb)
+       fes = -KBT_ * math.log(aveh) + KBT_ * math.log(max_histo / np.sum(ww_blocco))
        errf = KBT_ / aveh * errh
-       nhb = hblock[key]
        # printout
-       if(nhb > 1):
-          log.write("   %12.6lf %12.6lf %12.6lf\n" % (fes, errf, (errf*math.sqrt(2.0/(nhb-1)))))
-       else:
-          log.write("   %12.6lf %12.6lf     Infinity\n" % (fes, errf))
+       log.write("   %12.6lf %12.6lf  \n" % (fes, errf))
     else:
        log.write("       Infinity\n")
 log.close()
