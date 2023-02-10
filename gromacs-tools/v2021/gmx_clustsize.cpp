@@ -997,12 +997,12 @@ static void do_interm_mat(const char*             trx,
                 for(int ii=0; ii<natmol2[mol_id[i]]; ii++) {
                    for(int jj=0; jj<natmol2[mol_id[i]]; jj++) {
                       if(interm_same_mat_mdist[ii][jj]<100.) {
-                        if(write_histo) interm_same_mat_histo[mol_id[i]][ii][jj][static_cast<unsigned>(std::floor(interm_same_mat_mdist[ii][jj]/(cut/55.)))]++;
+                        interm_same_mat_histo[mol_id[i]][ii][jj][static_cast<unsigned>(std::floor(interm_same_mat_mdist[ii][jj]/(cut/55.)))]++;
                         interm_same_mat_dist[mol_id[i]][ii][jj] += interm_same_mat_mdist[ii][jj];
                         interm_same_mat_dist_count[mol_id[i]][ii][jj]+=1.;
                       } 
                       if(intram_mat_mdist[ii][jj]<100.) {
-                        if(write_histo) intram_mat_histo[mol_id[i]][ii][jj][static_cast<unsigned>(std::floor(intram_mat_mdist[ii][jj]/(cut/55.)))]++;
+                        intram_mat_histo[mol_id[i]][ii][jj][static_cast<unsigned>(std::floor(intram_mat_mdist[ii][jj]/(cut/55.)))]++;
                         intram_mat_dist[mol_id[i]][ii][jj] += intram_mat_mdist[ii][jj];
                         intram_mat_dist_count[mol_id[i]][ii][jj]+=1.;
                       }
@@ -1012,7 +1012,7 @@ static void do_interm_mat(const char*             trx,
                    for(int ii=0; ii<natmol2[mol_id[i]]; ii++) {
                       for(int jj=0; jj<natmol2[mol_id[j]]; jj++) {
                          if(interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj]<100.) {
-                           if(write_histo) interm_cross_mat_histo[cross_index[mol_id[i]][j]][ii][jj][static_cast<unsigned>(std::floor(interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj]/(cut/55.)))]++;
+                           interm_cross_mat_histo[cross_index[mol_id[i]][j]][ii][jj][static_cast<unsigned>(std::floor(interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj]/(cut/55.)))]++;
                            interm_cross_mat_dist[cross_index[mol_id[i]][j]][ii][jj] += interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj];
                            interm_cross_mat_dist_count[cross_index[mol_id[i]][j]][ii][jj]+=1.;
                          }
