@@ -775,6 +775,7 @@ static inline int is_flag(const std::vector<int> &v)
     std::vector<int> rv(v.size());
     std::reverse_copy(v.begin(), v.end(), rv.begin());
     auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](int a, int b) {return (a<=b) && (b!=0);});
+/*
     double norm = 0;
     double accumulate = 0;
     if(j3!=rv.end()) {
@@ -789,6 +790,7 @@ static inline int is_flag(const std::vector<int> &v)
        if(norm==0) norm=1.;
        if(accumulate/norm<0.005) return 0;
     }
+*/
     if(j3!=rv.end()) return 1;
     else return 0;
 }
