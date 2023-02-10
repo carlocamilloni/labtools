@@ -673,6 +673,98 @@ static void clust_size(const char*             ndx,
     sfree(index);
 }
 
+static inline double is_dist(const std::vector<int> &v, const double cut)
+{
+    std::vector<int> rv(v.size());
+    std::reverse_copy(v.begin(), v.end(), rv.begin());
+    auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](int a, int b) {return (a<=b) && (b!=0);});
+    double d12 = 0.;
+    double dexp = 0.;
+    double norm = 0.;
+    if(j3!=rv.end()) {
+       for(auto it = v.begin()+1; it != v.end()-std::distance(rv.begin(), j3); ++it) { 
+          unsigned i = std::distance(v.begin(), it);
+          if(v[i]>0.) {
+             double d = (cut/55.*static_cast<double>(i)+cut/110.);
+             d12+=v[i]*std::pow(1./d,12.);
+             norm += v[i];
+          }
+       }
+    } else {
+       for(auto it = v.begin()+1; it != v.end(); ++it) { 
+          unsigned i = std::distance(v.begin(), it);
+          if(v[i]>0.) {
+             double d = (cut/55.*static_cast<double>(i)+cut/110.);
+             dexp+=v[i]*std::exp(1./d/0.1);
+             norm += v[i];
+          }
+       }
+    }
+    if (norm == 0.) norm = 1.;
+    d12 = (d12>0. ? std::pow(d12/norm, -1./12.):0.);
+    dexp = (dexp>0. ? (1./0.1)/std::log(dexp/norm):0.);
+    return std::max(d12, dexp); 
+}
+
+static inline double is_dist_max(const std::vector<int> &v, const double cut)
+{
+    std::vector<int> rv(v.size());
+    std::reverse_copy(v.begin(), v.end(), rv.begin());
+    auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](int a, int b) {return (a<=b) && (b!=0);});
+    double d12 = 0.;
+    double dexp = 0.;
+    double norm = 0.;
+    std::vector<double> dist_max;
+    dist_max.resize(v.size());
+    if(j3!=rv.end()) {
+       for(auto it = v.begin()+1; it != v.end()-std::distance(rv.begin(), j3); ++it) {
+          unsigned i = std::distance(v.begin(), it);
+          if(v[i]>0.) {
+             double d = (cut/55.*static_cast<double>(i)+cut/110.);
+             //d12+=v[i]*std::pow(1./d,12.);
+             norm += v[i];
+	     dist_max[i] = v[i] * std::pow(1./d, 6.);
+          }
+       }
+       int distmax_index = std::distance(dist_max.begin(),std::max_element(dist_max.begin(), dist_max.end()));
+       return cut/55.*distmax_index+cut/110.;
+    } else {
+	for(auto it = v.begin()+1; it != v.end(); ++it) {
+          unsigned i = std::distance(v.begin(), it);
+          if(v[i]>0.) {
+             double d = (cut/55.*static_cast<double>(i)+cut/110.);
+             dexp+=v[i]*std::exp(1./d/0.1);
+             norm += v[i];
+          }
+       }
+       dexp = (dexp>0. ? (1./0.1)/std::log(dexp/norm):0.);
+       return dexp;
+    }
+}
+
+static inline int is_flag(const std::vector<int> &v)
+{
+    std::vector<int> rv(v.size());
+    std::reverse_copy(v.begin(), v.end(), rv.begin());
+    auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](int a, int b) {return (a<=b) && (b!=0);});
+    double norm = 0;
+    double accumulate = 0;
+    if(j3!=rv.end()) {
+       for(auto it = v.begin()+1; it != v.end(); ++it) {
+          unsigned i = std::distance(v.begin(), it);
+          norm+=v[i];
+       }
+       for(auto it = v.begin()+1; it != v.end()-std::distance(rv.begin(), j3); ++it) { 
+          unsigned i = std::distance(v.begin(), it);
+          accumulate += v[i];
+       }
+       if(norm==0) norm=1.;
+       if(accumulate/norm<0.005) return 0;
+    }
+    if(j3!=rv.end()) return 1;
+    else return 0;
+}
+
 static void do_interm_mat(const char*             trx,
                           const char*             outfile_inter,
                           const char*             outfile_intra,
@@ -771,10 +863,6 @@ static void do_interm_mat(const char*             trx,
     std::vector<std::vector<std::vector<double> > > interm_same_mat_dist(natmol2.size());    
     std::vector<std::vector<std::vector<double> > > interm_cross_mat_dist((natmol2.size()*(natmol2.size()-1))/2);    
     std::vector<std::vector<std::vector<double> > > intram_mat_dist(natmol2.size());    
-    // matrix atm x atm for average r12 distances 
-    std::vector<std::vector<std::vector<double> > > interm_same_mat_dist12(natmol2.size());    
-    std::vector<std::vector<std::vector<double> > > interm_cross_mat_dist12((natmol2.size()*(natmol2.size()-1))/2);    
-    std::vector<std::vector<std::vector<double> > > intram_mat_dist12(natmol2.size());    
     // Tensor atm x atm x 110 to accumulate histograms
     std::vector<std::vector<std::vector<std::vector<int> > > > interm_same_mat_histo(natmol2.size());  
     std::vector<std::vector<std::vector<std::vector<int> > > > interm_cross_mat_histo((natmol2.size()*(natmol2.size()-1))/2);    
@@ -789,15 +877,12 @@ static void do_interm_mat(const char*             trx,
       intram_mat_dist_count[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
       interm_same_mat_dist[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
       intram_mat_dist[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
-      interm_same_mat_dist12[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
-      intram_mat_dist12[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
       interm_same_mat_histo[i].resize(natmol2[i], std::vector<std::vector<int>>(natmol2[i], std::vector<int>(55,0)));
       intram_mat_histo[i].resize(natmol2[i], std::vector<std::vector<int>>(natmol2[i], std::vector<int>(55,0)));
       for(int j=i+1; j<natmol2.size();j++) {
         interm_cross_mat[cross_count].resize(natmol2[i], std::vector<double>(natmol2[j],0.));
         interm_cross_mat_dist_count[cross_count].resize(natmol2[i], std::vector<double>(natmol2[j],0.));
         interm_cross_mat_dist[cross_count].resize(natmol2[i], std::vector<double>(natmol2[j],0.));
-        interm_cross_mat_dist12[cross_count].resize(natmol2[i], std::vector<double>(natmol2[j],0.));
         interm_cross_mat_histo[cross_count].resize(natmol2[i], std::vector<std::vector<int>>(natmol2[j], std::vector<int>(55,0)));
         cross_index[i][j]=cross_count;
         cross_count++;
@@ -852,14 +937,10 @@ static void do_interm_mat(const char*             trx,
                 std::vector<std::vector<std::vector<int> > > added_cross((natmol2.size()*(natmol2.size()-1))/2);
                 // matrices atm x atm for accumulating distances 
                 std::vector<std::vector<double> > interm_same_mat_mdist(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[i]], 100.));    
-                std::vector<std::vector<double> > interm_same_mat_Mdist12(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[i]], 0.));    
                 std::vector<std::vector<double> > intram_mat_mdist(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[i]], 100.));    
-                std::vector<std::vector<double> > intram_mat_Mdist12(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[i]], 0.));    
                 std::vector<std::vector<std::vector<double> > > interm_cross_mat_mdist((natmol2.size()*(natmol2.size()-1))/2);
-                std::vector<std::vector<std::vector<double> > > interm_cross_mat_Mdist12((natmol2.size()*(natmol2.size()-1))/2); 
                 for (int j = mol_id[i]+1; j < natmol2.size(); j++) {
                     interm_cross_mat_mdist[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[j]], 100.));    
-                    interm_cross_mat_Mdist12[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[j]], 0.));
                     added_cross[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<int>(natmol2[mol_id[j]], 0));
                 }
                 /* Loop over molecules  */
@@ -885,7 +966,6 @@ static void do_interm_mat(const char*             trx,
                             else rvec_sub(x[ii], x[jj], dx);
                             double dx2 = iprod(dx, dx);
                             if(dx2 < cut2) {
-                                double id12 = std::pow(1./dx2,-0.5*d_pow);
                                 if(i!=j) { // intermolecular
                                    if(mol_id[i]==mol_id[j]) { // inter same molecule specie
                                       if(!added[a_i][a_j]) {
@@ -896,22 +976,17 @@ static void do_interm_mat(const char*             trx,
                                       }
                                       interm_same_mat_mdist[a_i][a_j] = std::min(interm_same_mat_mdist[a_i][a_j], sqrt(dx2));
                                       interm_same_mat_mdist[a_j][a_i] = std::min(interm_same_mat_mdist[a_i][a_j], sqrt(dx2));
-                                      interm_same_mat_Mdist12[a_i][a_j] = std::max(interm_same_mat_Mdist12[a_i][a_j], id12);
-                                      interm_same_mat_Mdist12[a_j][a_i] = std::max(interm_same_mat_Mdist12[a_i][a_j], id12);
                                    } else { // inter cross molecule specie
                                       if(!added_cross[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j]) {
                                         interm_cross_mat[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j] +=  norm;
                                         added_cross[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j] = 1;
                                       }
                                       interm_cross_mat_mdist[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j] = std::min(interm_cross_mat_mdist[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j], sqrt(dx2));
-                                      interm_cross_mat_Mdist12[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j] = std::max(interm_cross_mat_Mdist12[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j], id12);
                                    }
                                 } else { // intramolecular
                                    intram_mat[mol_id[i]][a_i][a_j] += norm;
                                    intram_mat_mdist[a_i][a_j] = std::min(intram_mat_mdist[a_i][a_j], sqrt(dx2));
                                    intram_mat_mdist[a_j][a_i] = std::min(intram_mat_mdist[a_i][a_j], sqrt(dx2));
-                                   intram_mat_Mdist12[a_i][a_j] = std::max(intram_mat_Mdist12[a_i][a_j], id12);
-                                   intram_mat_Mdist12[a_j][a_i] = std::max(intram_mat_Mdist12[a_i][a_j], id12);
                                 }
                             }
                             a_j++;
@@ -924,13 +999,11 @@ static void do_interm_mat(const char*             trx,
                       if(interm_same_mat_mdist[ii][jj]<100.) {
                         if(write_histo) interm_same_mat_histo[mol_id[i]][ii][jj][static_cast<unsigned>(std::floor(interm_same_mat_mdist[ii][jj]/(cut/55.)))]++;
                         interm_same_mat_dist[mol_id[i]][ii][jj] += interm_same_mat_mdist[ii][jj];
-                        interm_same_mat_dist12[mol_id[i]][ii][jj] += interm_same_mat_Mdist12[ii][jj];
                         interm_same_mat_dist_count[mol_id[i]][ii][jj]+=1.;
                       } 
                       if(intram_mat_mdist[ii][jj]<100.) {
                         if(write_histo) intram_mat_histo[mol_id[i]][ii][jj][static_cast<unsigned>(std::floor(intram_mat_mdist[ii][jj]/(cut/55.)))]++;
                         intram_mat_dist[mol_id[i]][ii][jj] += intram_mat_mdist[ii][jj];
-                        intram_mat_dist12[mol_id[i]][ii][jj] += intram_mat_Mdist12[ii][jj];
                         intram_mat_dist_count[mol_id[i]][ii][jj]+=1.;
                       }
                    }
@@ -941,7 +1014,6 @@ static void do_interm_mat(const char*             trx,
                          if(interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj]<100.) {
                            if(write_histo) interm_cross_mat_histo[cross_index[mol_id[i]][j]][ii][jj][static_cast<unsigned>(std::floor(interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj]/(cut/55.)))]++;
                            interm_cross_mat_dist[cross_index[mol_id[i]][j]][ii][jj] += interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj];
-                           interm_cross_mat_dist12[cross_index[mol_id[i]][j]][ii][jj] += interm_cross_mat_Mdist12[cross_index[mol_id[i]][j]][ii][jj];
                            interm_cross_mat_dist_count[cross_index[mol_id[i]][j]][ii][jj]+=1.;
                          }
                       }
@@ -966,17 +1038,13 @@ static void do_interm_mat(const char*             trx,
              intram_mat[i][ii][jj] /= static_cast<double>(n_x);
              if(interm_same_mat_dist_count[i][ii][jj] > 0) {
                 interm_same_mat_dist[i][ii][jj] = interm_same_mat_dist[i][ii][jj]/interm_same_mat_dist_count[i][ii][jj];
-                interm_same_mat_dist12[i][ii][jj] = std::pow(interm_same_mat_dist12[i][ii][jj]/interm_same_mat_dist_count[i][ii][jj], 1./d_pow);
              } else {
                 interm_same_mat_dist[i][ii][jj] = 0.;
-                interm_same_mat_dist12[i][ii][jj] = 0.;
              }
              if(intram_mat_dist_count[i][ii][jj] > 0) {
                 intram_mat_dist[i][ii][jj] = intram_mat_dist[i][ii][jj]/intram_mat_dist_count[i][ii][jj];
-                intram_mat_dist12[i][ii][jj] = std::pow(intram_mat_dist12[i][ii][jj]/intram_mat_dist_count[i][ii][jj], 1./d_pow);
              } else {
                 intram_mat_dist[i][ii][jj] = 0.;
-                intram_mat_dist12[i][ii][jj] = 0.;
              }
              if(write_histo) {
                 FILE *fp = nullptr;
@@ -1001,10 +1069,8 @@ static void do_interm_mat(const char*             trx,
                 interm_cross_mat[cross_index[i][j]][ii][jj] /= static_cast<double>(n_x);
                 if(interm_cross_mat_dist_count[cross_index[i][j]][ii][jj] > 0) {
                    interm_cross_mat_dist[cross_index[i][j]][ii][jj] = interm_cross_mat_dist[cross_index[i][j]][ii][jj]/interm_cross_mat_dist_count[cross_index[i][j]][ii][jj];
-                   interm_cross_mat_dist12[cross_index[i][j]][ii][jj] = std::pow(interm_cross_mat_dist12[cross_index[i][j]][ii][jj]/interm_cross_mat_dist_count[cross_index[i][j]][ii][jj], 1./d_pow);
                 } else {
                    interm_cross_mat_dist[cross_index[i][j]][ii][jj] = 0.;
-                   interm_cross_mat_dist12[cross_index[i][j]][ii][jj] = 0.;
                 }
                 if(write_histo) {
                    FILE *fp = nullptr;
@@ -1027,7 +1093,9 @@ static void do_interm_mat(const char*             trx,
        fp = gmx_ffopen(inter_file_name.insert(found,"_"+std::to_string(i+1)+"_"+std::to_string(i+1)), "w");
        for(int ii=0; ii<natmol2[i]; ii++) {
           for(int jj=0; jj<natmol2[i]; jj++) {
-             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, ii+1, i+1, jj+1, interm_same_mat_dist[i][ii][jj], interm_same_mat_dist12[i][ii][jj], interm_same_mat[i][ii][jj]);
+             double d = is_dist(interm_same_mat_histo[i][ii][jj], cut);
+             int flag = is_flag(interm_same_mat_histo[i][ii][jj]);
+             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf %1i\n", i+1, ii+1, i+1, jj+1, interm_same_mat_dist[i][ii][jj], d, interm_same_mat[i][ii][jj], flag);
           }
        }
        gmx_ffclose(fp);
@@ -1036,7 +1104,9 @@ static void do_interm_mat(const char*             trx,
        fp = gmx_ffopen(intra_file_name.insert(found,"_"+std::to_string(i+1)+"_"+std::to_string(i+1)), "w");
        for(int ii=0; ii<natmol2[i]; ii++) {
           for(int jj=0; jj<natmol2[i]; jj++) {
-             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, ii+1, i+1, jj+1, intram_mat_dist[i][ii][jj], intram_mat_dist12[i][ii][jj], intram_mat[i][ii][jj]);
+             double d = is_dist(intram_mat_histo[i][ii][jj], cut);
+             int flag = is_flag(intram_mat_histo[i][ii][jj]);
+             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf %1i\n", i+1, ii+1, i+1, jj+1, intram_mat_dist[i][ii][jj], d, intram_mat[i][ii][jj], flag);
           }
        }
        gmx_ffclose(fp);
@@ -1046,7 +1116,9 @@ static void do_interm_mat(const char*             trx,
           fp = gmx_ffopen(inter_c_file_name.insert(found,"_"+std::to_string(i+1)+"_"+std::to_string(j+1)), "w");
           for(int ii=0; ii<natmol2[i]; ii++) {
              for(int jj=0; jj<natmol2[j]; jj++) {
-                fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, ii+1, j+1, jj+1, interm_cross_mat_dist[cross_index[i][j]][ii][jj], interm_cross_mat_dist12[cross_index[i][j]][ii][jj], interm_cross_mat[cross_index[i][j]][ii][jj]);
+                double d = is_dist(interm_cross_mat_histo[cross_index[i][j]][ii][jj], cut);
+                int flag = is_flag(interm_cross_mat_histo[cross_index[i][j]][ii][jj]);
+                fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf %1i\n", i+1, ii+1, j+1, jj+1, interm_cross_mat_dist[cross_index[i][j]][ii][jj], d, interm_cross_mat[cross_index[i][j]][ii][jj], flag);
              }
           }
           gmx_ffclose(fp);
