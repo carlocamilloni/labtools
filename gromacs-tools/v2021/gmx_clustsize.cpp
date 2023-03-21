@@ -673,73 +673,80 @@ static void clust_size(const char*             ndx,
     sfree(index);
 }
 
-static inline double is_dist(const std::vector<int> &v, const double cut)
+static inline double calc_sigma(const std::vector<int> &v, const double cut)
 {
     std::vector<int> rv(v.size());
     std::reverse_copy(v.begin(), v.end(), rv.begin());
     auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](int a, int b) {return (a<=b) && (b!=0);});
-    double d12 = 0.;
-    double dexp = 0.;
+    double dm = 0.;
+    double d2m = 0.;
     double norm = 0.;
-    if(j3!=rv.end()) {
-       for(auto it = v.begin()+1; it != v.end()-std::distance(rv.begin(), j3); ++it) { 
-          unsigned i = std::distance(v.begin(), it);
-          if(v[i]>0.) {
-             double d = (cut/55.*static_cast<double>(i)+cut/110.);
-             d12+=v[i]*std::pow(1./d,12.);
-             norm += v[i];
-          }
-       }
-    } else {
-       for(auto it = v.begin()+1; it != v.end(); ++it) { 
-          unsigned i = std::distance(v.begin(), it);
-          if(v[i]>0.) {
-             double d = (cut/55.*static_cast<double>(i)+cut/110.);
-             dexp+=v[i]*std::exp(1./d/0.1);
-             norm += v[i];
-          }
-       }
-    }
-    if (norm == 0.) norm = 1.;
-    d12 = (d12>0. ? std::pow(d12/norm, -1./12.):0.);
-    dexp = (dexp>0. ? (1./0.1)/std::log(dexp/norm):0.);
-    return std::max(d12, dexp); 
-}
-
-static inline double is_dist_max(const std::vector<int> &v, const double cut)
-{
-    std::vector<int> rv(v.size());
-    std::reverse_copy(v.begin(), v.end(), rv.begin());
-    auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](int a, int b) {return (a<=b) && (b!=0);});
-    double d12 = 0.;
-    double dexp = 0.;
-    double norm = 0.;
-    std::vector<double> dist_max;
-    dist_max.resize(v.size());
     if(j3!=rv.end()) {
        for(auto it = v.begin()+1; it != v.end()-std::distance(rv.begin(), j3); ++it) {
           unsigned i = std::distance(v.begin(), it);
           if(v[i]>0.) {
              double d = (cut/55.*static_cast<double>(i)+cut/110.);
-             //d12+=v[i]*std::pow(1./d,12.);
+             dm+=v[i] * d;
+             d2m+=v[i] * d * d;
              norm += v[i];
-	     dist_max[i] = v[i] * std::pow(1./d, 6.);
           }
        }
-       int distmax_index = std::distance(dist_max.begin(),std::max_element(dist_max.begin(), dist_max.end()));
-       return cut/55.*distmax_index+cut/110.;
     } else {
-	for(auto it = v.begin()+1; it != v.end(); ++it) {
+       return -1;
+    }
+    if (norm == 0.) norm = 1.;
+    double sigma = std::sqrt(d2m/norm - dm*dm/norm/norm);
+    return sigma;
+}
+
+static inline double is_dist(const std::vector<int> &v, const double cut, const double sigma)
+{
+    std::vector<int> rv(v.size());
+    std::reverse_copy(v.begin(), v.end(), rv.begin());
+    auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](int a, int b) {return (a<=b) && (b!=0);});
+    //auto first_val = std::upper_bound(v.begin(), v.end(), 0);
+    auto first_val = find_if( std::begin(v), std::end(v), [](auto x) { return x != 0; });
+    auto last_val = find_if( std::rbegin(v), std::rend(v), [](auto x) { return x != 0; });
+    auto until = v.end()-std::distance(rv.begin(), j3);
+    double mind = (cut/55.*static_cast<double>(std::distance(v.begin(),first_val))+cut/110.);
+    double maxd = std::min((cut/55.*static_cast<double>(std::distance(v.begin(),(last_val+1).base()))+cut/110.),(cut/55.*static_cast<double>(std::distance(v.begin(),until))+cut/110.));
+    double sigma_cut = (maxd-mind)/6.; 
+    double dm = 0.;
+    double d12 = 0.;
+    double dexp = 0.;
+    double norm = 0.;
+    double norm_exp = 0.;
+    if(j3!=rv.end()) {
+       if (sigma > sigma_cut) until = until - std::distance(first_val, until)/2;
+       for(auto it = v.begin()+1; it != until; ++it) { 
           unsigned i = std::distance(v.begin(), it);
           if(v[i]>0.) {
              double d = (cut/55.*static_cast<double>(i)+cut/110.);
-             dexp+=v[i]*std::exp(1./d/0.1);
+             d12+=v[i]*std::pow(1./d,12.);
+             dm+=v[i]*d;
              norm += v[i];
           }
        }
-       dexp = (dexp>0. ? (1./0.1)/std::log(dexp/norm):0.);
-       return dexp;
+    } else {
+      for(auto it = v.begin()+1; it != v.end(); ++it) { 
+         unsigned i = std::distance(v.begin(), it);
+         if(v[i]>0.) {
+            double d = (cut/55.*static_cast<double>(i)+cut/110.);
+            dexp+=v[i]*std::exp(1./d/0.1);
+            norm_exp += v[i];
+         }
+      }
     }
+    if (norm == 0.) norm = 1.;
+    if (norm_exp == 0.) norm_exp = 1.;
+    dm = (dm>0. ? dm/norm:0.);
+    d12 = (d12>0. ? std::pow(d12/norm, -1./12.):0.);
+    dexp = (dexp>0. ? (1./0.1)/std::log(dexp/norm_exp):0.);
+    double d=0.;
+    if(j3!=rv.end()) d = d12;
+    else d = dexp;
+
+    return d; 
 }
 
 static inline int is_flag(const std::vector<int> &v)
@@ -747,22 +754,6 @@ static inline int is_flag(const std::vector<int> &v)
     std::vector<int> rv(v.size());
     std::reverse_copy(v.begin(), v.end(), rv.begin());
     auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](int a, int b) {return (a<=b) && (b!=0);});
-/*
-    double norm = 0;
-    double accumulate = 0;
-    if(j3!=rv.end()) {
-       for(auto it = v.begin()+1; it != v.end(); ++it) {
-          unsigned i = std::distance(v.begin(), it);
-          norm+=v[i];
-       }
-       for(auto it = v.begin()+1; it != v.end()-std::distance(rv.begin(), j3); ++it) { 
-          unsigned i = std::distance(v.begin(), it);
-          accumulate += v[i];
-       }
-       if(norm==0) norm=1.;
-       if(accumulate/norm<0.005) return 0;
-    }
-*/
     if(j3!=rv.end()) return 1;
     else return 0;
 }
@@ -818,7 +809,7 @@ static void do_interm_mat(const char*             trx,
     // number of atoms per molecule, assuming them identical when consecutive molecules have the same number of atoms
     std::vector<int> natmol2;
     natmol2.push_back(mols.block(0).end());
-    for(unsigned i=1; i<nindex; i++) {
+    for(int i=1; i<nindex; i++) {
        natmol2.push_back(mols.block(i).end()-mols.block(i-1).end());
        if(natmol2[i]==natmol2[i-1]) num_mol[num_unique_molecules]++;
        else {
@@ -837,7 +828,7 @@ static void do_interm_mat(const char*             trx,
     num_unique_molecules=0;
     inv_num_mol.push_back(1./(static_cast<double>(num_mol[num_unique_molecules])));
 
-    for(unsigned i=1; i<nindex; i++) {
+    for(int i=1; i<nindex; i++) {
        if(mols.block(i).end()-mols.block(i-1).end()==natmol2[num_unique_molecules]) {
           start_index.push_back(start_index[i-1]);
        } else {
@@ -848,8 +839,8 @@ static void do_interm_mat(const char*             trx,
        inv_num_mol.push_back(1./static_cast<double>(num_mol[num_unique_molecules]));
     }
 
-    printf("number of different molecules %u\n", natmol2.size());
-    for(unsigned i=0; i<natmol2.size();i++) printf("mol %u num %u size %u\n", i, num_mol[i], natmol2[i]);
+    printf("number of different molecules %lu\n", natmol2.size());
+    for(std::size_t i=0; i<natmol2.size();i++) printf("mol %lu num %u size %u\n", i, num_mol[i], natmol2[i]);
     //for(unsigned i=0; i<nindex;i++) printf("start_idnex %u %u\n", i, start_index[i]);
     //for(unsigned i=0; i<nindex;i++) printf("invnummol %u %lf\n", i, inv_num_mol[i]);
 
@@ -872,7 +863,7 @@ static void do_interm_mat(const char*             trx,
 
     int cross_count=0;
     std::vector<std::vector<int> > cross_index(natmol2.size(), std::vector<int>(natmol2.size(),0));
-    for(int i=0; i<natmol2.size();i++) {
+    for(std::size_t i=0; i<natmol2.size();i++) {
       interm_same_mat[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
       intram_mat[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
       interm_same_mat_dist_count[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
@@ -881,7 +872,7 @@ static void do_interm_mat(const char*             trx,
       intram_mat_dist[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
       interm_same_mat_histo[i].resize(natmol2[i], std::vector<std::vector<int>>(natmol2[i], std::vector<int>(55,0)));
       intram_mat_histo[i].resize(natmol2[i], std::vector<std::vector<int>>(natmol2[i], std::vector<int>(55,0)));
-      for(int j=i+1; j<natmol2.size();j++) {
+      for(std::size_t j=i+1; j<natmol2.size();j++) {
         interm_cross_mat[cross_count].resize(natmol2[i], std::vector<double>(natmol2[j],0.));
         interm_cross_mat_dist_count[cross_count].resize(natmol2[i], std::vector<double>(natmol2[j],0.));
         interm_cross_mat_dist[cross_count].resize(natmol2[i], std::vector<double>(natmol2[j],0.));
@@ -929,7 +920,7 @@ static void do_interm_mat(const char*             trx,
                     xcm[i][m] /= tm;
                 }
             }
-   
+
             /* Loop over molecules */
             for (int i = 0; i < nindex; i++)
             {
@@ -941,7 +932,7 @@ static void do_interm_mat(const char*             trx,
                 std::vector<std::vector<double> > interm_same_mat_mdist(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[i]], 100.));    
                 std::vector<std::vector<double> > intram_mat_mdist(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[i]], 100.));    
                 std::vector<std::vector<std::vector<double> > > interm_cross_mat_mdist((natmol2.size()*(natmol2.size()-1))/2);
-                for (int j = mol_id[i]+1; j < natmol2.size(); j++) {
+                for (std::size_t j = mol_id[i]+1; j < natmol2.size(); j++) {
                     interm_cross_mat_mdist[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[j]], 100.));    
                     added_cross[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<int>(natmol2[mol_id[j]], 0));
                 }
@@ -1010,7 +1001,7 @@ static void do_interm_mat(const char*             trx,
                       }
                    }
                 }
-                for (int j = mol_id[i]+1; j < natmol2.size(); j++) {
+                for (std::size_t j = mol_id[i]+1; j < natmol2.size(); j++) {
                    for(int ii=0; ii<natmol2[mol_id[i]]; ii++) {
                       for(int jj=0; jj<natmol2[mol_id[j]]; jj++) {
                          if(interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj]<100.) {
@@ -1033,7 +1024,7 @@ static void do_interm_mat(const char*             trx,
     printf("Done!\n"); fflush(stdout);
 
     // normalisations
-    for(int i=0; i<natmol2.size(); i++) {
+    for(std::size_t i=0; i<natmol2.size(); i++) {
        for(int ii=0; ii<natmol2[i]; ii++) {
           for(int jj=0; jj<natmol2[i]; jj++) {
              interm_same_mat[i][ii][jj] /= static_cast<double>(n_x);
@@ -1065,7 +1056,7 @@ static void do_interm_mat(const char*             trx,
              }
           }
        }
-       for(int j=i+1; j<natmol2.size(); j++) {
+       for(std::size_t j=i+1; j<natmol2.size(); j++) {
           for(int ii=0; ii<natmol2[i]; ii++) {
              for(int jj=0; jj<natmol2[j]; jj++) {
                 interm_cross_mat[cross_index[i][j]][ii][jj] /= static_cast<double>(n_x);
@@ -1095,9 +1086,10 @@ static void do_interm_mat(const char*             trx,
        fp = gmx_ffopen(inter_file_name.insert(found,"_"+std::to_string(i+1)+"_"+std::to_string(i+1)), "w");
        for(int ii=0; ii<natmol2[i]; ii++) {
           for(int jj=0; jj<natmol2[i]; jj++) {
-             double d = is_dist(interm_same_mat_histo[i][ii][jj], cut);
+	     double sigma = calc_sigma(intram_mat_histo[i][ii][jj], cut);
+             double d = is_dist(interm_same_mat_histo[i][ii][jj], cut, sigma);
              int flag = is_flag(interm_same_mat_histo[i][ii][jj]);
-             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf %1i\n", i+1, ii+1, i+1, jj+1, interm_same_mat_dist[i][ii][jj], d, interm_same_mat[i][ii][jj], flag);
+             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf %1i %9.6lf\n", i+1, ii+1, i+1, jj+1, interm_same_mat_dist[i][ii][jj], d, interm_same_mat[i][ii][jj], flag, sigma);
           }
        }
        gmx_ffclose(fp);
@@ -1106,9 +1098,10 @@ static void do_interm_mat(const char*             trx,
        fp = gmx_ffopen(intra_file_name.insert(found,"_"+std::to_string(i+1)+"_"+std::to_string(i+1)), "w");
        for(int ii=0; ii<natmol2[i]; ii++) {
           for(int jj=0; jj<natmol2[i]; jj++) {
-             double d = is_dist(intram_mat_histo[i][ii][jj], cut);
+	     double sigma = calc_sigma(intram_mat_histo[i][ii][jj], cut);
+             double d = is_dist(intram_mat_histo[i][ii][jj], cut, sigma);
              int flag = is_flag(intram_mat_histo[i][ii][jj]);
-             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf %1i\n", i+1, ii+1, i+1, jj+1, intram_mat_dist[i][ii][jj], d, intram_mat[i][ii][jj], flag);
+             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf %1i %9.6lf\n", i+1, ii+1, i+1, jj+1, intram_mat_dist[i][ii][jj], d, intram_mat[i][ii][jj], flag, sigma);
           }
        }
        gmx_ffclose(fp);
@@ -1118,9 +1111,10 @@ static void do_interm_mat(const char*             trx,
           fp = gmx_ffopen(inter_c_file_name.insert(found,"_"+std::to_string(i+1)+"_"+std::to_string(j+1)), "w");
           for(int ii=0; ii<natmol2[i]; ii++) {
              for(int jj=0; jj<natmol2[j]; jj++) {
-                double d = is_dist(interm_cross_mat_histo[cross_index[i][j]][ii][jj], cut);
+	        double sigma = calc_sigma(intram_mat_histo[i][ii][jj], cut);
+                double d = is_dist(interm_cross_mat_histo[cross_index[i][j]][ii][jj], cut, sigma);
                 int flag = is_flag(interm_cross_mat_histo[cross_index[i][j]][ii][jj]);
-                fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf %1i\n", i+1, ii+1, j+1, jj+1, interm_cross_mat_dist[cross_index[i][j]][ii][jj], d, interm_cross_mat[cross_index[i][j]][ii][jj], flag);
+                fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf %1i %9.6lf\n", i+1, ii+1, j+1, jj+1, interm_cross_mat_dist[cross_index[i][j]][ii][jj], d, interm_cross_mat[cross_index[i][j]][ii][jj], flag, sigma);
              }
           }
           gmx_ffclose(fp);
