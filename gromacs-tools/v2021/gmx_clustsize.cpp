@@ -704,7 +704,6 @@ static inline double is_dist(const std::vector<int> &v, const double cut, const 
     std::vector<int> rv(v.size());
     std::reverse_copy(v.begin(), v.end(), rv.begin());
     auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](int a, int b) {return (a<=b) && (b!=0);});
-    //auto first_val = std::upper_bound(v.begin(), v.end(), 0);
     auto first_val = find_if( std::begin(v), std::end(v), [](auto x) { return x != 0; });
     auto last_val = find_if( std::rbegin(v), std::rend(v), [](auto x) { return x != 0; });
     auto until = v.end()-std::distance(rv.begin(), j3);
@@ -743,8 +742,10 @@ static inline double is_dist(const std::vector<int> &v, const double cut, const 
     d12 = (d12>0. ? std::pow(d12/norm, -1./12.):0.);
     dexp = (dexp>0. ? (1./0.1)/std::log(dexp/norm_exp):0.);
     double d=0.;
-    if(j3!=rv.end()) d = d12;
-    else d = dexp;
+    if(j3!=rv.end()) {
+       if(sigma > sigma_cut) d = dm;
+       else d = d12;
+    } else d = dexp;
 
     return d; 
 }
