@@ -99,14 +99,14 @@ print-nose-hoover-chain-variables = no
 ; Groups to couple separately
 tc-grps                  = system
 ; Time constant (ps) and reference temperature (K)
-tau_t                    = 0.2
+tau_t                    = 1.0
 ref_t                    = _TEMP_ 
 ; pressure coupling     
 Pcoupl                   = c-rescale 
 Pcoupltype               = isotropic
 nstpcouple               = -1
 ; Time constant (ps), compressibility (1/bar) and reference P (bar)
-tau_p                    = 1.0
+tau_p                    = 5.0
 compressibility          = 4.5e-5
 ref_p                    = 1.0
 ; Scaling of reference coordinates, No, All or COM
@@ -128,11 +128,11 @@ Shake-SOR                = no
 ; Relative tolerance of shake
 shake-tol                = 0.0001
 ; Highest order in the expansion of the constraint coupling matrix
-lincs-order              = 6
+lincs-order              = 4
 ; Number of iterations in the final step of LINCS. 1 is fine for
 ; normal simulations, but use 2 to conserve energy in NVE runs.
 ; For energy minimization with constraints it should be 4 to 8.
-lincs-iter               = 2
+lincs-iter               = 1
 ; Lincs will write a warning to the stderr if in one step a bond
 ; rotates over more degrees than
 lincs-warnangle          = 30
