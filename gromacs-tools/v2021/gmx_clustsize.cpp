@@ -40,6 +40,7 @@
 #include <cmath>
 
 #include <algorithm>
+#include <functional> 
 #include <numeric>
 
 #include "gromacs/commandline/filenm.h"
@@ -107,7 +108,7 @@ static void clust_size(const char*             ndx,
     gmx_mtop_t*   mtop    = nullptr;
     PbcType       pbcType = PbcType::Unset;
     int           ii, jj;
-    double          temp, tfac;
+    double        temp, tfac;
     /* Cluster size distribution (matrix) */
     double** cs_dist = nullptr;
     double** tr_matrix = nullptr;
@@ -119,7 +120,7 @@ static void clust_size(const char*             ndx,
     int *  clust_index, *index_size, *index_old_size, *clust_size, *clust_written, max_clust_size, max_clust_ind, nav, nhisto;
     t_rgb  rlo          = { 1.0, 1.0, 1.0 };
     int    frameCounter = 0;
-    double   frameTime;
+    double frameTime;
 
     clear_trxframe(&fr, TRUE);
     auto timeLabel = output_env_get_time_label(oenv);
@@ -561,7 +562,7 @@ static void clust_size(const char*             ndx,
         gmx_ffclose(fp);
     }
 
-    /* Print the double distribution cluster-size/numer, averaged over the trajectory. */
+    /* Print the real distribution cluster-size/numer, averaged over the trajectory. */
     fp     = xvgropen(histo, "Cluster size distribution", "Cluster size", "()", oenv);
     nhisto = 0;
     fprintf(fp, "%5d  %8.3f\n", 0, 0.0);
@@ -638,8 +639,6 @@ static void clust_size(const char*             ndx,
     fprintf(stderr, "cmid: %g, cmax: %g, max_size: %d\n", cmid, cmax, max_size);
     cmid = 1;
     fp   = gmx_ffopen(xpm, "w");
-    //write_xpm3(fp, 0, "Cluster size distribution", "# clusters", timeLabel, "Size", n_x, max_size,
-    //           (real)t_x, (real)t_y, cs_dist, 0, cmid, cmax, rlo, rmid, rhi, &nlevels);
     gmx_ffclose(fp);
     cmid = 100.0;
     cmax = 0.0;
@@ -657,8 +656,6 @@ static void clust_size(const char*             ndx,
     }
     fprintf(stderr, "cmid: %g, cmax: %g, max_size: %d\n", cmid, cmax, max_size);
     fp = gmx_ffopen(xpmw, "w");
-    //write_xpm3(fp, 0, "Weighted cluster size distribution", "Fraction", timeLabel, "Size", n_x,
-    //           max_size, t_x, t_y, cs_dist, 0, cmid, cmax, rlo, rmid, rhi, &nlevels);
     gmx_ffclose(fp);
     delete mtop;
     sfree(t_x);
@@ -673,90 +670,128 @@ static void clust_size(const char*             ndx,
     sfree(index);
 }
 
-static inline double calc_sigma(const std::vector<int> &v, const double cut)
-{
-    std::vector<int> rv(v.size());
-    std::reverse_copy(v.begin(), v.end(), rv.begin());
-    auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](int a, int b) {return (a<=b) && (b!=0);});
-    double dm = 0.;
-    double d2m = 0.;
-    double norm = 0.;
-    if(j3!=rv.end()) {
-       for(auto it = v.begin()+1; it != v.end()-std::distance(rv.begin(), j3); ++it) {
-          unsigned i = std::distance(v.begin(), it);
-          if(v[i]>0.) {
-             double d = (cut/55.*static_cast<double>(i)+cut/110.);
-             dm+=v[i] * d;
-             d2m+=v[i] * d * d;
-             norm += v[i];
-          }
-       }
-    } else {
-       return -1;
+static inline void kernel_density_estimator(std::vector<double> &x, const std::vector<double> &bins, const double mu, const double norm) {
+    double h = 0.01;
+    double from_x = std::max(mu - 2 * h, bins[0]);
+    double to_x = std::min(mu + 2 * h, bins.back());
+    auto is_geq_start = [&from_x](double i){ return i >= from_x; };
+    auto is_geq_end = [&to_x](double i){ return i > to_x; };
+    auto start = std::find_if(bins.begin(), bins.end(), is_geq_start);
+    auto end = std::find_if(bins.begin(), bins.end(), is_geq_end);
+    int from = std::distance(bins.begin(), start);
+    int to = std::distance(bins.begin(), end);
+    double scale = norm/(0.73853587* h * std::sqrt(2.*M_PI));
+    if(mu<h) scale *= 2.;
+    double shift = std::exp(-2.);
+    for (int i = from; i < to; i++) {
+        double f=(mu-bins[i])/h;
+        double kernel = std::exp(-0.5*f*f);
+        x[i] += scale*(kernel-shift);
     }
-    if (norm == 0.) norm = 1.;
-    double sigma = std::sqrt(d2m/norm - dm*dm/norm/norm);
-    return sigma;
 }
 
-static inline double is_dist(const std::vector<int> &v, const double cut, const double sigma)
+static inline double calc_mean(const std::vector<double> &v, const double dx)
 {
-    std::vector<int> rv(v.size());
+    double dm = 0.;
+    double norm = 0.;
+    for(auto it = v.begin(); it != v.end(); ++it) {
+       unsigned i = std::distance(v.begin(), it);
+       if(v[i]>0.) {
+          double d = (dx*static_cast<double>(i)+0.5*dx);
+          dm+=v[i]*d;
+          norm+=v[i];
+       }
+    }
+    if (norm==0.) norm = 1.;
+    return dm/norm;
+}
+
+static inline double calc_prob(const std::vector<double> &v, const double dx)
+{
+    double prob = 0.;
+    for(auto it = v.begin(); it != v.end(); ++it) {
+       unsigned i = std::distance(v.begin(), it);
+       if(v[i]>0.) {
+          prob += v[i]*dx;
+       }
+    }
+    if(prob>1.) prob = 1.;
+    return prob;
+}
+
+static inline int is_single_gauss(const std::vector<double> &v, const double dx)
+{
+    std::vector<double> rv(v.size());
     std::reverse_copy(v.begin(), v.end(), rv.begin());
-    auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](int a, int b) {return (a<=b) && (b!=0);});
-    auto first_val = find_if( std::begin(v), std::end(v), [](auto x) { return x != 0; });
-    auto last_val = find_if( std::rbegin(v), std::rend(v), [](auto x) { return x != 0; });
+    auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](double a, double b) {return (a<=b) && (b!=0);});
     auto until = v.end()-std::distance(rv.begin(), j3);
-    double mind = (cut/55.*static_cast<double>(std::distance(v.begin(),first_val))+cut/110.);
-    double maxd = std::min((cut/55.*static_cast<double>(std::distance(v.begin(),(last_val+1).base()))+cut/110.),(cut/55.*static_cast<double>(std::distance(v.begin(),until))+cut/110.));
-    double sigma_cut = (maxd-mind)/6.; 
-    double dm = 0.;
-    double d12 = 0.;
-    double dexp = 0.;
-    double norm = 0.;
-    double norm_exp = 0.;
-    if(j3!=rv.end()) {
-       if (sigma > sigma_cut) until = until - std::distance(first_val, until)/2;
-       for(auto it = v.begin()+1; it != until; ++it) { 
-          unsigned i = std::distance(v.begin(), it);
-          if(v[i]>0.) {
-             double d = (cut/55.*static_cast<double>(i)+cut/110.);
-             d12+=v[i]*std::pow(1./d,12.);
-             dm+=v[i]*d;
-             norm += v[i];
-          }
-       }
-    } else {
-      for(auto it = v.begin()+1; it != v.end(); ++it) { 
-         unsigned i = std::distance(v.begin(), it);
-         if(v[i]>0.) {
-            double d = (cut/55.*static_cast<double>(i)+cut/110.);
-            dexp+=v[i]*std::exp(1./d/0.1);
-            norm_exp += v[i];
-         }
-      }
+    std::vector<double> slope(v.size()-2);
+    unsigned counter = 0;
+    for ( auto it = v.begin()+1; it != until; ++it )
+    {
+        unsigned i = std::distance(v.begin(), it);
+        slope[counter] = (v[i+1] - v[i-1]) / (2.*dx);
+        counter++;
     }
-    if (norm == 0.) norm = 1.;
-    if (norm_exp == 0.) norm_exp = 1.;
-    dm = (dm>0. ? dm/norm:0.);
-    d12 = (d12>0. ? std::pow(d12/norm, -1./12.):0.);
-    dexp = (dexp>0. ? (1./0.1)/std::log(dexp/norm_exp):0.);
-    double d=0.;
-    if(j3!=rv.end()) {
-       if(sigma > sigma_cut) d = dm;
-       else d = d12;
-    } else d = dexp;
 
-    return d; 
+    int danger_sign=0;
+    int danger_trend=0;
+    int increasing=1;
+    for (int i=0; i < slope.size()-1; i++)
+    {
+        if(slope[i+1]!=0||slope[i]!=0){
+           if(increasing&&slope[i]>15.&&slope[i+1]<slope[i]) {
+              increasing=0;
+              danger_trend++;
+           }
+           if(!increasing&&slope[i+1]>slope[i]) {
+              increasing=1;
+              danger_trend++;
+           }
+           if(danger_trend>2) return 0;
+           if(!danger_sign&&danger_trend>1) return 0;
+
+           if(slope[i]*slope[i+1]<0.) {
+             if(danger_sign) return 0;
+             danger_sign = 1;
+           }
+        }
+    }
+    return 1;
 }
 
-static inline int is_flag(const std::vector<int> &v)
+static inline double is_dist(const std::vector<double> &v, const double dx)
 {
-    std::vector<int> rv(v.size());
+    // test if the distribution is close to a Gaussian
+    int is_gauss = is_single_gauss(v, dx);
+    std::vector<double> rv(v.size());
     std::reverse_copy(v.begin(), v.end(), rv.begin());
-    auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](int a, int b) {return (a<=b) && (b!=0);});
-    if(j3!=rv.end()) return 1;
-    else return 0;
+    auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](double a, double b) {return (a<=b) && (b!=0);});
+    auto first_val = find_if( std::begin(v), std::end(v), [](auto x) { return x != 0; });
+    auto until = v.end()-std::distance(rv.begin(), j3);
+    if (!is_gauss) until = until - std::distance(first_val, until)/2;
+
+    double d12 = 0.;
+    double norm = 0.;
+    for(auto it = v.begin()+1; it != until; ++it) { 
+       unsigned i = std::distance(v.begin(), it);
+       if(v[i]>0.) {
+          double d = (dx*static_cast<double>(i)+0.5*dx);
+          d12+=v[i]*std::pow(1./d,12.);
+          norm+=v[i];
+       }
+    }
+    if (norm == 0.) norm = 1.;
+    d12 = (d12>0. ? std::pow(d12/norm, -1./12.):0.);
+    return d12;
+}
+
+
+
+#define NBINS 4
+static inline int n_bins(const double cut, const double factor = 1.0)
+{
+    return cut / (0.01 / factor);
 }
 
 static void do_interm_mat(const char*             trx,
@@ -845,39 +880,21 @@ static void do_interm_mat(const char*             trx,
     //for(unsigned i=0; i<nindex;i++) printf("start_idnex %u %u\n", i, start_index[i]);
     //for(unsigned i=0; i<nindex;i++) printf("invnummol %u %lf\n", i, inv_num_mol[i]);
 
-    // matrix atm x atm for probabilities
-    std::vector<std::vector<std::vector<double> > > interm_same_mat(natmol2.size());    
-    std::vector<std::vector<std::vector<double> > > interm_cross_mat((natmol2.size()*(natmol2.size()-1))/2);    
-    std::vector<std::vector<std::vector<double> > > intram_mat(natmol2.size());
-    // matrix atm x atm for normalising distances  
-    std::vector<std::vector<std::vector<double> > > interm_same_mat_dist_count(natmol2.size());    
-    std::vector<std::vector<std::vector<double> > > interm_cross_mat_dist_count((natmol2.size()*(natmol2.size()-1))/2);    
-    std::vector<std::vector<std::vector<double> > > intram_mat_dist_count(natmol2.size());    
-    // matrix atm x atm for average distances 
-    std::vector<std::vector<std::vector<double> > > interm_same_mat_dist(natmol2.size());    
-    std::vector<std::vector<std::vector<double> > > interm_cross_mat_dist((natmol2.size()*(natmol2.size()-1))/2);    
-    std::vector<std::vector<std::vector<double> > > intram_mat_dist(natmol2.size());    
-    // Tensor atm x atm x 110 to accumulate histograms
-    std::vector<std::vector<std::vector<std::vector<int> > > > interm_same_mat_histo(natmol2.size());  
-    std::vector<std::vector<std::vector<std::vector<int> > > > interm_cross_mat_histo((natmol2.size()*(natmol2.size()-1))/2);    
-    std::vector<std::vector<std::vector<std::vector<int> > > > intram_mat_histo(natmol2.size());
+    // Tensor atm x atm x nbins to accumulate density function
+    std::vector<std::vector<std::vector<std::vector<double> > > > interm_same_mat_density(natmol2.size());
+    std::vector<std::vector<std::vector<std::vector<double> > > > interm_cross_mat_density((natmol2.size()*(natmol2.size()-1))/2);
+    std::vector<std::vector<std::vector<std::vector<double> > > > intram_mat_density(natmol2.size());
+
+    std::vector<double> density_bins(n_bins(cut, NBINS));
+    for (int i = 0; i < density_bins.size(); i++ ) density_bins[i] = cut/static_cast<double>(density_bins.size())*static_cast<double>(i)+cut/static_cast<double>(density_bins.size()*2);
 
     int cross_count=0;
     std::vector<std::vector<int> > cross_index(natmol2.size(), std::vector<int>(natmol2.size(),0));
     for(std::size_t i=0; i<natmol2.size();i++) {
-      interm_same_mat[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
-      intram_mat[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
-      interm_same_mat_dist_count[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
-      intram_mat_dist_count[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
-      interm_same_mat_dist[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
-      intram_mat_dist[i].resize(natmol2[i], std::vector<double>(natmol2[i],0.));
-      interm_same_mat_histo[i].resize(natmol2[i], std::vector<std::vector<int>>(natmol2[i], std::vector<int>(55,0)));
-      intram_mat_histo[i].resize(natmol2[i], std::vector<std::vector<int>>(natmol2[i], std::vector<int>(55,0)));
+      interm_same_mat_density[i].resize(natmol2[i], std::vector<std::vector<double>>(natmol2[i], std::vector<double>(n_bins(cut, NBINS),0)));
+      intram_mat_density[i].resize(natmol2[i], std::vector<std::vector<double>>(natmol2[i], std::vector<double>(n_bins(cut, NBINS),0)));
       for(std::size_t j=i+1; j<natmol2.size();j++) {
-        interm_cross_mat[cross_count].resize(natmol2[i], std::vector<double>(natmol2[j],0.));
-        interm_cross_mat_dist_count[cross_count].resize(natmol2[i], std::vector<double>(natmol2[j],0.));
-        interm_cross_mat_dist[cross_count].resize(natmol2[i], std::vector<double>(natmol2[j],0.));
-        interm_cross_mat_histo[cross_count].resize(natmol2[i], std::vector<std::vector<int>>(natmol2[j], std::vector<int>(55,0)));
+        interm_cross_mat_density[i].resize(natmol2[i], std::vector<std::vector<double>>(natmol2[j], std::vector<double>(n_bins(cut, NBINS),0)));
         cross_index[i][j]=cross_count;
         cross_count++;
       }
@@ -888,13 +905,14 @@ static void do_interm_mat(const char*             trx,
     snew(xcm, nindex);
 
     double mcut2 = mol_cut*mol_cut;
-    double cut2   = cut * cut;
+    double cut_sig_2 = (cut + 0.02) * (cut + 0.02);
     // total number of trajectory frames
     int nframe = 0;
     // number of analysed frames
     int n_x = 0;
 
     printf("Ready!\n"); fflush(stdout);
+    const char *atomname;
 
     do
     {
@@ -925,62 +943,53 @@ static void do_interm_mat(const char*             trx,
             /* Loop over molecules */
             for (int i = 0; i < nindex; i++)
             {
+                int molb = 0;
                 // Temporary structures for intermediate values
                 // this is to set that at least on interaction has been found
-                std::vector<std::vector<int> > added(natmol2[mol_id[i]], std::vector<int>(natmol2[mol_id[i]], 0));
-                std::vector<std::vector<std::vector<int> > > added_cross((natmol2.size()*(natmol2.size()-1))/2);
+                // for each molecule we want to count an atom pair no more than once, and we consider the pair with the shorter distance
                 // matrices atm x atm for accumulating distances 
                 std::vector<std::vector<double> > interm_same_mat_mdist(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[i]], 100.));    
                 std::vector<std::vector<double> > intram_mat_mdist(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[i]], 100.));    
                 std::vector<std::vector<std::vector<double> > > interm_cross_mat_mdist((natmol2.size()*(natmol2.size()-1))/2);
                 for (std::size_t j = mol_id[i]+1; j < natmol2.size(); j++) {
                     interm_cross_mat_mdist[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<double>(natmol2[mol_id[j]], 100.));    
-                    added_cross[cross_index[mol_id[i]][j]].resize(natmol2[mol_id[i]], std::vector<int>(natmol2[mol_id[j]], 0));
                 }
                 /* Loop over molecules  */
                 for (int j = 0; j < nindex; j++)
                 {
                     rvec dx;
-                    if (bPBC) pbc_dx(&pbc, xcm[i], xcm[j], dx);
-                    else rvec_sub(xcm[i], xcm[j], dx);
-                    double dx2 = iprod(dx, dx);
-                    if (dx2 > mcut2) continue;
+                    if(j!=i) {
+                      if (bPBC) pbc_dx(&pbc, xcm[i], xcm[j], dx);
+                      else rvec_sub(xcm[i], xcm[j], dx);
+                      double dx2 = iprod(dx, dx);
+                      if (dx2 > mcut2) continue;
+                    }
                     if(mol_id[i]!=mol_id[j]&&j<i) continue;
 
                     /* Compute distance */
                     int a_i = 0;
-                    double norm = std::max(inv_num_mol[i],inv_num_mol[j]);
                     GMX_RELEASE_ASSERT(mols.numBlocks() > 0,"Cannot access index[] from empty mols");
                     for (int ii = mols.block(i).begin(); ii < mols.block(i).end(); ii++)
                     {
                         int a_j = 0;
+                        mtopGetAtomAndResidueName(mtop, ii, &molb, &atomname, nullptr, nullptr, nullptr);
+                        if(atomname[0]=='H') {a_i++; continue;}
                         for (int jj = mols.block(j).begin(); jj < mols.block(j).end(); jj++)
                         {
+                            mtopGetAtomAndResidueName(mtop, jj, &molb, &atomname, nullptr, nullptr, nullptr);
+                            if(atomname[0]=='H') {a_j++; continue;}
                             if (bPBC) pbc_dx(&pbc, x[ii], x[jj], dx);
                             else rvec_sub(x[ii], x[jj], dx);
                             double dx2 = iprod(dx, dx);
-                            if(dx2 < cut2) {
+                            if(dx2 < cut_sig_2) {
                                 if(i!=j) { // intermolecular
                                    if(mol_id[i]==mol_id[j]) { // inter same molecule specie
-                                      if(!added[a_i][a_j]) {
-                                        interm_same_mat[mol_id[i]][a_i][a_j] +=  norm;
-                                        if(a_i!=a_j) interm_same_mat[mol_id[i]][a_j][a_i] += norm;
-                                        added[a_i][a_j] = 1;
-                                        added[a_j][a_i] = 1;
-                                      }
-                                      interm_same_mat_mdist[a_i][a_j] = std::min(interm_same_mat_mdist[a_i][a_j], sqrt(dx2));
-                                      interm_same_mat_mdist[a_j][a_i] = std::min(interm_same_mat_mdist[a_i][a_j], sqrt(dx2));
+                                      interm_same_mat_mdist[a_i][a_j] = std::min(interm_same_mat_mdist[a_i][a_j], dx2);
                                    } else { // inter cross molecule specie
-                                      if(!added_cross[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j]) {
-                                        interm_cross_mat[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j] +=  norm;
-                                        added_cross[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j] = 1;
-                                      }
-                                      interm_cross_mat_mdist[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j] = std::min(interm_cross_mat_mdist[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j], sqrt(dx2));
+                                      interm_cross_mat_mdist[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j] = std::min(interm_cross_mat_mdist[cross_index[mol_id[i]][mol_id[j]]][a_i][a_j], dx2);
                                    }
                                 } else { // intramolecular
-                                   intram_mat[mol_id[i]][a_i][a_j] += norm;
-                                   intram_mat_mdist[a_i][a_j] = std::min(intram_mat_mdist[a_i][a_j], sqrt(dx2));
-                                   intram_mat_mdist[a_j][a_i] = std::min(intram_mat_mdist[a_i][a_j], sqrt(dx2));
+                                   intram_mat_mdist[a_i][a_j] = std::min(intram_mat_mdist[a_i][a_j], dx2);
                                 }
                             }
                             a_j++;
@@ -989,16 +998,12 @@ static void do_interm_mat(const char*             trx,
                     }
                 }
                 for(int ii=0; ii<natmol2[mol_id[i]]; ii++) {
-                   for(int jj=0; jj<natmol2[mol_id[i]]; jj++) {
+                   for(int jj=ii; jj<natmol2[mol_id[i]]; jj++) {
                       if(interm_same_mat_mdist[ii][jj]<100.) {
-                        interm_same_mat_histo[mol_id[i]][ii][jj][static_cast<unsigned>(std::floor(interm_same_mat_mdist[ii][jj]/(cut/55.)))]++;
-                        interm_same_mat_dist[mol_id[i]][ii][jj] += interm_same_mat_mdist[ii][jj];
-                        interm_same_mat_dist_count[mol_id[i]][ii][jj]+=1.;
+                        kernel_density_estimator(interm_same_mat_density[mol_id[i]][ii][jj], density_bins, std::sqrt(interm_same_mat_mdist[ii][jj]), inv_num_mol[i]);
                       } 
                       if(intram_mat_mdist[ii][jj]<100.) {
-                        intram_mat_histo[mol_id[i]][ii][jj][static_cast<unsigned>(std::floor(intram_mat_mdist[ii][jj]/(cut/55.)))]++;
-                        intram_mat_dist[mol_id[i]][ii][jj] += intram_mat_mdist[ii][jj];
-                        intram_mat_dist_count[mol_id[i]][ii][jj]+=1.;
+                        kernel_density_estimator(intram_mat_density[mol_id[i]][ii][jj], density_bins, std::sqrt(intram_mat_mdist[ii][jj]), inv_num_mol[i]);
                       }
                    }
                 }
@@ -1006,9 +1011,7 @@ static void do_interm_mat(const char*             trx,
                    for(int ii=0; ii<natmol2[mol_id[i]]; ii++) {
                       for(int jj=0; jj<natmol2[mol_id[j]]; jj++) {
                          if(interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj]<100.) {
-                           interm_cross_mat_histo[cross_index[mol_id[i]][j]][ii][jj][static_cast<unsigned>(std::floor(interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj]/(cut/55.)))]++;
-                           interm_cross_mat_dist[cross_index[mol_id[i]][j]][ii][jj] += interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj];
-                           interm_cross_mat_dist_count[cross_index[mol_id[i]][j]][ii][jj]+=1.;
+                           kernel_density_estimator(interm_cross_mat_density[cross_index[mol_id[i]][j]][ii][jj], density_bins, std::sqrt(interm_cross_mat_mdist[cross_index[mol_id[i]][j]][ii][jj]),std::max(inv_num_mol[i],inv_num_mol[j]));
                          }
                       }
                    }
@@ -1025,56 +1028,61 @@ static void do_interm_mat(const char*             trx,
     printf("Done!\n"); fflush(stdout);
 
     // normalisations
+    double norm = 1./n_x;
+
     for(std::size_t i=0; i<natmol2.size(); i++) {
        for(int ii=0; ii<natmol2[i]; ii++) {
-          for(int jj=0; jj<natmol2[i]; jj++) {
-             interm_same_mat[i][ii][jj] /= static_cast<double>(n_x);
-             intram_mat[i][ii][jj] /= static_cast<double>(n_x);
-             if(interm_same_mat_dist_count[i][ii][jj] > 0) {
-                interm_same_mat_dist[i][ii][jj] = interm_same_mat_dist[i][ii][jj]/interm_same_mat_dist_count[i][ii][jj];
-             } else {
-                interm_same_mat_dist[i][ii][jj] = 0.;
-             }
-             if(intram_mat_dist_count[i][ii][jj] > 0) {
-                intram_mat_dist[i][ii][jj] = intram_mat_dist[i][ii][jj]/intram_mat_dist_count[i][ii][jj];
-             } else {
-                intram_mat_dist[i][ii][jj] = 0.;
-             }
-             if(write_histo) {
-                FILE *fp = nullptr;
-                std::string ffh = "inter_mol_"+std::to_string(i+1)+"_"+std::to_string(i+1)+"_aa_"+std::to_string(ii+1)+"_"+std::to_string(jj+1)+".dat";
-                fp = gmx_ffopen(ffh, "w");
-                for(int k=0; k<55; k++) {
-                   fprintf(fp, "%lf %d\n",  cut/55.*k+cut/110., interm_same_mat_histo[i][ii][jj][k]);
-                }
-                gmx_ffclose(fp);
-                ffh = "intra_mol_"+std::to_string(i+1)+"_"+std::to_string(i+1)+"_aa_"+std::to_string(ii+1)+"_"+std::to_string(jj+1)+".dat";
-                fp = gmx_ffopen(ffh, "w");
-                for(int k=0; k<55; k++) {
-                   fprintf(fp, "%lf %d\n",  cut/55.*k+cut/110., intram_mat_histo[i][ii][jj][k]);
-                }
-                gmx_ffclose(fp);
-             }
+          for(int jj=ii; jj<natmol2[i]; jj++) {
+             std::transform(interm_same_mat_density[i][ii][jj].begin(), interm_same_mat_density[i][ii][jj].end(), interm_same_mat_density[i][ii][jj].begin(), [&norm](auto& c){return c*norm;});
+             std::transform(intram_mat_density[i][ii][jj].begin(), intram_mat_density[i][ii][jj].end(), intram_mat_density[i][ii][jj].begin(), [&norm](auto& c){return c*norm;});
+             interm_same_mat_density[i][jj][ii]=interm_same_mat_density[i][ii][jj];
+             intram_mat_density[i][jj][ii]=intram_mat_density[i][ii][jj];
           }
        }
        for(std::size_t j=i+1; j<natmol2.size(); j++) {
           for(int ii=0; ii<natmol2[i]; ii++) {
              for(int jj=0; jj<natmol2[j]; jj++) {
-                interm_cross_mat[cross_index[i][j]][ii][jj] /= static_cast<double>(n_x);
-                if(interm_cross_mat_dist_count[cross_index[i][j]][ii][jj] > 0) {
-                   interm_cross_mat_dist[cross_index[i][j]][ii][jj] = interm_cross_mat_dist[cross_index[i][j]][ii][jj]/interm_cross_mat_dist_count[cross_index[i][j]][ii][jj];
-                } else {
-                   interm_cross_mat_dist[cross_index[i][j]][ii][jj] = 0.;
+                std::transform(interm_cross_mat_density[cross_index[i][j]][ii][jj].begin(), interm_cross_mat_density[cross_index[i][j]][ii][jj].end(), interm_cross_mat_density[cross_index[i][j]][ii][jj].begin(), [&norm](auto& c){return c*norm;});
+             }
+          }
+       }
+    }
+
+    if(write_histo) {
+       for(std::size_t i=0; i<natmol2.size(); i++) {
+          for(int ii=0; ii<natmol2[i]; ii++) {
+             FILE *fp_inter = nullptr;
+             FILE *fp_intra = nullptr;
+             std::string ffh_inter = "inter_mol_"+std::to_string(i+1)+"_"+std::to_string(i+1)+"_aa_"+std::to_string(ii+1)+".dat";
+             fp_inter = gmx_ffopen(ffh_inter, "w");
+             std::string ffh_intra = "intra_mol_"+std::to_string(i+1)+"_"+std::to_string(i+1)+"_aa_"+std::to_string(ii+1)+".dat";
+             fp_intra = gmx_ffopen(ffh_intra, "w");
+             for(int k=0; k<interm_same_mat_density[i][ii][0].size(); k++) {
+                fprintf(fp_inter, "%lf",  density_bins[k]);
+                fprintf(fp_intra, "%lf",  density_bins[k]);
+                for(int jj=0; jj<natmol2[i]; jj++) {
+                      fprintf(fp_inter, " %lf",  interm_same_mat_density[i][ii][jj][k]);
+                      fprintf(fp_intra, " %lf",  intram_mat_density[i][ii][jj][k]);
                 }
-                if(write_histo) {
-                   FILE *fp = nullptr;
-                   std::string ffh = "inter_mol_"+std::to_string(i+1)+"_"+std::to_string(j+1)+"_aa_"+std::to_string(ii+1)+"_"+std::to_string(jj+1)+".dat";
-                   fp = gmx_ffopen(ffh, "w");
-                   for(int k=0; k<55; k++) {
-                      fprintf(fp, "%lf %d\n",  cut/55.*k+cut/110., interm_cross_mat_histo[cross_index[i][j]][ii][jj][k]);
+                fprintf(fp_inter,"\n");
+                fprintf(fp_intra,"\n");
+             }
+             gmx_ffclose(fp_inter);
+             gmx_ffclose(fp_intra);
+          }
+          for(std::size_t j=i+1; j<natmol2.size(); j++) {
+             for(int ii=0; ii<natmol2[i]; ii++) {
+                FILE *fp = nullptr;
+                std::string ffh = "inter_mol_"+std::to_string(i+1)+"_"+std::to_string(j+1)+"_aa_"+std::to_string(ii+1)+".dat";
+                fp = gmx_ffopen(ffh, "w");
+		for(int k=0; k<interm_cross_mat_density[cross_index[i][j]][ii][0].size(); k++) {
+                   fprintf(fp, "%lf",  density_bins[k]);
+                   for(int jj=0; jj<natmol2[j]; jj++) {
+                      fprintf(fp, " %lf", interm_cross_mat_density[cross_index[i][j]][ii][jj][k]);
                    }
-                   gmx_ffclose(fp);
+                   fprintf(fp, "\n");
                 }
+                gmx_ffclose(fp);
              }
           }
        }
@@ -1087,10 +1095,11 @@ static void do_interm_mat(const char*             trx,
        fp = gmx_ffopen(inter_file_name.insert(found,"_"+std::to_string(i+1)+"_"+std::to_string(i+1)), "w");
        for(int ii=0; ii<natmol2[i]; ii++) {
           for(int jj=0; jj<natmol2[i]; jj++) {
-	     double sigma = calc_sigma(intram_mat_histo[i][ii][jj], cut);
-             double d = is_dist(interm_same_mat_histo[i][ii][jj], cut, sigma);
-             int flag = is_flag(interm_same_mat_histo[i][ii][jj]);
-             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf %1i %9.6lf\n", i+1, ii+1, i+1, jj+1, interm_same_mat_dist[i][ii][jj], d, interm_same_mat[i][ii][jj], flag, sigma);
+             double dx = cut/static_cast<double>(interm_same_mat_density[i][ii][jj].size());
+             double dm = calc_mean(interm_same_mat_density[i][ii][jj], dx);
+             double prob = calc_prob(interm_same_mat_density[i][ii][jj], dx);
+             double d = is_dist(interm_same_mat_density[i][ii][jj], dx);
+             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, ii+1, i+1, jj+1, dm, d, prob);
           }
        }
        gmx_ffclose(fp);
@@ -1099,10 +1108,11 @@ static void do_interm_mat(const char*             trx,
        fp = gmx_ffopen(intra_file_name.insert(found,"_"+std::to_string(i+1)+"_"+std::to_string(i+1)), "w");
        for(int ii=0; ii<natmol2[i]; ii++) {
           for(int jj=0; jj<natmol2[i]; jj++) {
-	     double sigma = calc_sigma(intram_mat_histo[i][ii][jj], cut);
-             double d = is_dist(intram_mat_histo[i][ii][jj], cut, sigma);
-             int flag = is_flag(intram_mat_histo[i][ii][jj]);
-             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf %1i %9.6lf\n", i+1, ii+1, i+1, jj+1, intram_mat_dist[i][ii][jj], d, intram_mat[i][ii][jj], flag, sigma);
+             double dx = cut/static_cast<double>(intram_mat_density[i][ii][jj].size());
+	     double dm = calc_mean(intram_mat_density[i][ii][jj], dx);
+	     double prob = calc_prob(intram_mat_density[i][ii][jj], dx);
+             double d = is_dist(intram_mat_density[i][ii][jj], dx);
+             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, ii+1, i+1, jj+1, dm, d, prob);
           }
        }
        gmx_ffclose(fp);
@@ -1112,10 +1122,11 @@ static void do_interm_mat(const char*             trx,
           fp = gmx_ffopen(inter_c_file_name.insert(found,"_"+std::to_string(i+1)+"_"+std::to_string(j+1)), "w");
           for(int ii=0; ii<natmol2[i]; ii++) {
              for(int jj=0; jj<natmol2[j]; jj++) {
-	        double sigma = calc_sigma(intram_mat_histo[i][ii][jj], cut);
-                double d = is_dist(interm_cross_mat_histo[cross_index[i][j]][ii][jj], cut, sigma);
-                int flag = is_flag(interm_cross_mat_histo[cross_index[i][j]][ii][jj]);
-                fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf %1i %9.6lf\n", i+1, ii+1, j+1, jj+1, interm_cross_mat_dist[cross_index[i][j]][ii][jj], d, interm_cross_mat[cross_index[i][j]][ii][jj], flag, sigma);
+                double dx = cut/static_cast<double>(interm_cross_mat_density[cross_index[i][j]][ii][jj].size());
+	        double dm = calc_mean(interm_cross_mat_density[cross_index[i][j]][ii][jj], dx);
+	        double prob = calc_prob(interm_cross_mat_density[cross_index[i][j]][ii][jj], dx);
+                double d = is_dist(interm_cross_mat_density[cross_index[i][j]][ii][jj], dx);
+                fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, ii+1, j+1, jj+1, dm, d, prob);
              }
           }
           gmx_ffclose(fp);
