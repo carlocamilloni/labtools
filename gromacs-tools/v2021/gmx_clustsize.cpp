@@ -21,7 +21,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with GROMACS; if not, see
- * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * https://www.gnu.org/licenses, or write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
  *
  * If you want to redistribute modifications to GROMACS, please
@@ -30,10 +30,10 @@
  * consider code for inclusion in the official distribution, but
  * derived work must not be called official GROMACS. Details are found
  * in the README & COPYING files - if they are missing, get the
- * official version at http://www.gromacs.org.
+ * official version at https://www.gromacs.org.
  *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the research papers on the package. Check out http://www.gromacs.org.
+ * the research papers on the package. Check out https://www.gromacs.org.
  */
 #include "gmxpre.h"
 
@@ -333,8 +333,10 @@ static void clust_size(const char*             ndx,
                                 {
                                     if (clust_size[cj] <= 0)
                                     {
-                                        gmx_fatal(FARGS, "negative cluster size %d for element %d",
-                                                  clust_size[cj], cj);
+                                        gmx_fatal(FARGS,
+                                                  "negative cluster size %d for element %d",
+                                                  clust_size[cj],
+                                                  cj);
                                     }
                                     clust_size[cj]--;
                                     clust_index[k] = ci;
@@ -719,75 +721,6 @@ static inline double calc_prob(const std::vector<double> &v, const double dx)
     return prob;
 }
 
-static inline int is_single_gauss(const std::vector<double> &v, const double dx)
-{
-    std::vector<double> rv(v.size());
-    std::reverse_copy(v.begin(), v.end(), rv.begin());
-    auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](double a, double b) {return (a<=b) && (b!=0);});
-    auto until = v.end()-std::distance(rv.begin(), j3);
-    std::vector<double> slope(v.size()-2);
-    unsigned counter = 0;
-    for ( auto it = v.begin()+1; it != until; ++it )
-    {
-        unsigned i = std::distance(v.begin(), it);
-        slope[counter] = (v[i+1] - v[i-1]) / (2.*dx);
-        counter++;
-    }
-
-    int danger_sign=0;
-    int danger_trend=0;
-    int increasing=1;
-    for (int i=0; i < slope.size()-1; i++)
-    {
-        if(slope[i+1]!=0||slope[i]!=0){
-           if(increasing&&slope[i]>15.&&slope[i+1]<slope[i]) {
-              increasing=0;
-              danger_trend++;
-           }
-           if(!increasing&&slope[i+1]>slope[i]) {
-              increasing=1;
-              danger_trend++;
-           }
-           if(danger_trend>2) return 0;
-           if(!danger_sign&&danger_trend>1) return 0;
-
-           if(slope[i]*slope[i+1]<0.) {
-             if(danger_sign) return 0;
-             danger_sign = 1;
-           }
-        }
-    }
-    return 1;
-}
-
-static inline double is_dist(const std::vector<double> &v, const double dx)
-{
-    // test if the distribution is close to a Gaussian
-    int is_gauss = is_single_gauss(v, dx);
-    std::vector<double> rv(v.size());
-    std::reverse_copy(v.begin(), v.end(), rv.begin());
-    auto j3 = std::adjacent_find(rv.begin(), rv.end(), [](double a, double b) {return (a<=b) && (b!=0);});
-    auto first_val = find_if( std::begin(v), std::end(v), [](auto x) { return x != 0; });
-    auto until = v.end()-std::distance(rv.begin(), j3);
-    if (!is_gauss) until = until - std::distance(first_val, until)/2;
-
-    double d12 = 0.;
-    double norm = 0.;
-    for(auto it = v.begin()+1; it != until; ++it) { 
-       unsigned i = std::distance(v.begin(), it);
-       if(v[i]>0.) {
-          double d = (dx*static_cast<double>(i)+0.5*dx);
-          d12+=v[i]*std::pow(1./d,12.);
-          norm+=v[i];
-       }
-    }
-    if (norm == 0.) norm = 1.;
-    d12 = (d12>0. ? std::pow(d12/norm, -1./12.):0.);
-    return d12;
-}
-
-
-
 #define NBINS 4
 static inline int n_bins(const double cut, const double factor = 1.0)
 {
@@ -801,7 +734,6 @@ static void do_interm_mat(const char*             trx,
                           const char*             tpr,
                           double                  cut,
                           double                  mol_cut,
-                          double                  d_pow,
                           int                     nskip,
                           int                     skip_last_nmol,
                           gmx_bool                write_histo,
@@ -1098,8 +1030,7 @@ static void do_interm_mat(const char*             trx,
              double dx = cut/static_cast<double>(interm_same_mat_density[i][ii][jj].size());
              double dm = calc_mean(interm_same_mat_density[i][ii][jj], dx);
              double prob = calc_prob(interm_same_mat_density[i][ii][jj], dx);
-             double d = is_dist(interm_same_mat_density[i][ii][jj], dx);
-             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, ii+1, i+1, jj+1, dm, d, prob);
+             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf\n", i+1, ii+1, i+1, jj+1, dm, prob);
           }
        }
        gmx_ffclose(fp);
@@ -1111,8 +1042,7 @@ static void do_interm_mat(const char*             trx,
              double dx = cut/static_cast<double>(intram_mat_density[i][ii][jj].size());
 	     double dm = calc_mean(intram_mat_density[i][ii][jj], dx);
 	     double prob = calc_prob(intram_mat_density[i][ii][jj], dx);
-             double d = is_dist(intram_mat_density[i][ii][jj], dx);
-             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, ii+1, i+1, jj+1, dm, d, prob);
+             fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf\n", i+1, ii+1, i+1, jj+1, dm, prob);
           }
        }
        gmx_ffclose(fp);
@@ -1125,8 +1055,7 @@ static void do_interm_mat(const char*             trx,
                 double dx = cut/static_cast<double>(interm_cross_mat_density[cross_index[i][j]][ii][jj].size());
 	        double dm = calc_mean(interm_cross_mat_density[cross_index[i][j]][ii][jj], dx);
 	        double prob = calc_prob(interm_cross_mat_density[cross_index[i][j]][ii][jj], dx);
-                double d = is_dist(interm_cross_mat_density[cross_index[i][j]][ii][jj], dx);
-                fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf %9.6lf\n", i+1, ii+1, j+1, jj+1, dm, d, prob);
+                fprintf(fp, "%4i %4i %4i %4i %9.6lf %9.6lf\n", i+1, ii+1, j+1, jj+1, dm, prob);
              }
           }
           gmx_ffclose(fp);
@@ -1157,7 +1086,6 @@ int gmx_clustsize(int argc, char* argv[])
 
     real     cutoff = 0.50;
     real     mol_cutoff = 6.00;
-    real     d_pow = -6.;
     int      bOndx   = 0;
     int      nskip   = 0;
     int      skip_last_nmol = 0;
@@ -1204,7 +1132,6 @@ int gmx_clustsize(int argc, char* argv[])
           etINT,
           { &bOndx },
           "write index files for all oligomers size from 2 to tr_olig_ndx for every frame, it could enerate A LOT of files" },
-        { "-d_pow", FALSE, etREAL, { &d_pow }, "Averaging of distance^power" },
         { "-pbc", FALSE, etBOOL, { &bPBC }, "Use periodic boundary conditions" },
         { "-nskip", FALSE, etINT, { &nskip }, "Number of frames to skip between writing" },
         { "-nlevels",
@@ -1249,8 +1176,8 @@ int gmx_clustsize(int argc, char* argv[])
     };
 #define NFILE asize(fnm)
 
-    if (!parse_common_args(&argc, argv, PCA_CAN_VIEW | PCA_CAN_TIME | PCA_TIME_UNIT, NFILE, fnm,
-                           NPA, pa, asize(desc), desc, 0, nullptr, &oenv))
+    if (!parse_common_args(
+                &argc, argv, PCA_CAN_VIEW | PCA_CAN_TIME | PCA_TIME_UNIT, NFILE, fnm, NPA, pa, asize(desc), desc, 0, nullptr, &oenv))
     {
         return 0;
     }
@@ -1272,10 +1199,33 @@ int gmx_clustsize(int argc, char* argv[])
     }
 
     if(!iMAT)
-    clust_size(fnNDX, ftp2fn(efTRX, NFILE, fnm), opt2fn("-o", NFILE, fnm), opt2fn("-ow", NFILE, fnm),
-               opt2fn("-nc", NFILE, fnm), opt2fn("-ac", NFILE, fnm), opt2fn("-mc", NFILE, fnm),
-               opt2fn("-hc", NFILE, fnm), opt2fn("-hct", NFILE, fnm), opt2fn("-ict", NFILE, fnm), opt2fn("-trm", NFILE, fnm), opt2fn("-km", NFILE, fnm), 
-               opt2fn("-temp", NFILE, fnm), opt2fn("-mcn", NFILE, fnm), bMol, bPBC, fnTPR, cutoff, mol_cutoff, bOndx, nskip, skip_last_nmol, nlevels, rgblo, rgbhi, ndf, oenv);
+    clust_size(fnNDX,
+               ftp2fn(efTRX, NFILE, fnm),
+               opt2fn("-o", NFILE, fnm),
+               opt2fn("-ow", NFILE, fnm),
+               opt2fn("-nc", NFILE, fnm),
+               opt2fn("-ac", NFILE, fnm),
+               opt2fn("-mc", NFILE, fnm),
+               opt2fn("-hc", NFILE, fnm),
+               opt2fn("-hct", NFILE, fnm),
+               opt2fn("-ict", NFILE, fnm),
+               opt2fn("-trm", NFILE, fnm),
+               opt2fn("-km", NFILE, fnm),
+               opt2fn("-temp", NFILE, fnm),
+               opt2fn("-mcn", NFILE, fnm),
+               bMol,
+               bPBC,
+               fnTPR,
+               cutoff,
+               mol_cutoff,
+               bOndx,
+               nskip,
+               skip_last_nmol,
+               nlevels,
+               rgblo,
+               rgbhi,
+               ndf,
+               oenv);
 
     else if(iMAT)
     do_interm_mat(ftp2fn(efTRX, NFILE, fnm),
@@ -1285,7 +1235,6 @@ int gmx_clustsize(int argc, char* argv[])
                   fnTPR,
                   cutoff,
                   mol_cutoff,
-                  d_pow,
                   nskip,
                   skip_last_nmol,
                   iMAThis,
