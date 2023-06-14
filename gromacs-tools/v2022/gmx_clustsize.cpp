@@ -906,6 +906,16 @@ static void do_interm_mat(const char*             trx,
                             if (bPBC) pbc_dx(&pbc, x[ii], x[jj], dx);
                             else rvec_sub(x[ii], x[jj], dx);
                             double dx2 = iprod(dx, dx);
+                            double dx3 = 100;
+                            int delta = a_i-a_j;
+                            if(i!=j&&mol_id[i]==mol_id[j]) {
+                              // this is to account for inversion atom/molecule
+                              if (bPBC) pbc_dx(&pbc, x[ii-delta], x[jj+delta], dx);
+                              else rvec_sub(x[ii-delta], x[jj+delta], dx);
+                              dx3 = iprod(dx, dx);
+                            }
+                            if(dx3<dx2) dx2=dx3;
+
                             if(dx2 < cut_sig_2) {
                                 if(i!=j) { // intermolecular
                                    if(mol_id[i]==mol_id[j]) { // inter same molecule specie
