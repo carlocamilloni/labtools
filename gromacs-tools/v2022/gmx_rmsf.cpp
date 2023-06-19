@@ -221,8 +221,9 @@ int gmx_rmsf(int argc, char* argv[])
         "This shows the directions in which the atoms fluctuate the most and",
         "the least."
     };
-    static gmx_bool bRes = FALSE, bAniso = FALSE, bFit = TRUE;
+    static gmx_bool bMassWeighted = TRUE, bRes = FALSE, bAniso = FALSE, bFit = TRUE;
     t_pargs         pargs[] = {
+        { "-mw", FALSE, etBOOL, { &bMassWeighted }, "Use mass weighting" },
         { "-res", FALSE, etBOOL, { &bRes }, "Calculate averages for each residue" },
         { "-aniso", FALSE, etBOOL, { &bAniso }, "Compute anisotropic temperature factors" },
         { "-fit",
@@ -295,9 +296,18 @@ int gmx_rmsf(int argc, char* argv[])
     get_index(&top.atoms, ftp2fn_null(efNDX, NFILE, fnm), 1, &isize, &index, &grpnames);
 
     /* Set the weight */
+    if(bMassWeighted) fprintf(stderr, "using mass weights\n");
+    else fprintf(stderr, "not using mass weights\n");
     for (i = 0; i < isize; i++)
     {
-        w_rls[index[i]] = top.atoms.atom[index[i]].m;
+        if (bMassWeighted)
+        {
+            w_rls[index[i]] = top.atoms.atom[index[i]].m;
+        }
+        else
+        {
+            w_rls[index[i]] = 1;
+        }
     }
 
     /* Malloc the rmsf arrays */
@@ -341,7 +351,7 @@ int gmx_rmsf(int argc, char* argv[])
 
     if (bFit)
     {
-        sub_xcm(xref, isize, index, top.atoms.atom, xcm, FALSE);
+        sub_xcm(xref, isize, index, top.atoms.atom, xcm, FALSE, bMassWeighted);
     }
 
     natom = read_first_x(oenv, &status, ftp2fn(efTRX, NFILE, fnm), &t, &x, box);
@@ -369,7 +379,7 @@ int gmx_rmsf(int argc, char* argv[])
             gmx_rmpbc(gpbc, natom, box, x);
 
             /* Set center of mass to zero */
-            sub_xcm(x, isize, index, top.atoms.atom, xcm, FALSE);
+            sub_xcm(x, isize, index, top.atoms.atom, xcm, FALSE, bMassWeighted);
 
             /* Fit to reference structure */
             do_fit(natom, w_rls, xref, x);
@@ -428,10 +438,15 @@ int gmx_rmsf(int argc, char* argv[])
             for (m = 0; m < DIM; m++)
             {
                 U[i][d * DIM + m] = U[i][d * DIM + m] * invcount - xav[i * DIM + d] * xav[i * DIM + m];
-                Uaver[3 * d + m] += top.atoms.atom[index[i]].m * U[i][d * DIM + m];
+                if (bMassWeighted) {
+                    Uaver[3 * d + m] += top.atoms.atom[index[i]].m * U[i][d * DIM + m];
+                } else {
+                    Uaver[3 * d + m] += U[i][d * DIM + m];
+                }
             }
         }
-        totmass += top.atoms.atom[index[i]].m;
+        if (bMassWeighted) totmass += top.atoms.atom[index[i]].m;
+        else totmass += 1.;
     }
     for (d = 0; d < DIM * DIM; d++)
     {
