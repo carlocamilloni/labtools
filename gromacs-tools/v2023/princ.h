@@ -51,13 +51,13 @@ void principal_comp(int n, const int index[], t_atom atom[], rvec x[], matrix tr
 void orient_princ(const t_atoms* atoms, int isize, const int* index, int natoms, rvec x[], rvec* v, rvec d);
 /* rotates molecule to align principal axes with coordinate axes */
 
-real calc_xcm(const rvec x[], int gnx, const int* index, const t_atom* atom, rvec xcm, gmx_bool bQ, gmx_bool bMassW = true);
+real calc_xcm(const rvec x[], int gnx, const int* index, const t_atom* atom, rvec xcm, bool bQ, bool bMassW = true);
 /* Calculate the center of mass of the atoms in index. if bQ then the atoms
  * will be charge weighted rather than mass weighted.
  * Returns the total mass/charge.
  */
 
-real sub_xcm(rvec x[], int gnx, const int* index, const t_atom atom[], rvec xcm, gmx_bool bQ, gmx_bool bMassW = true);
+real sub_xcm(rvec x[], int gnx, const int* index, const t_atom atom[], rvec xcm, bool bQ, bool bMassW = true);
 /* Calc. the center of mass and subtract it from all coordinates.
  * Returns the original center of mass in xcm
  * Returns the total mass
